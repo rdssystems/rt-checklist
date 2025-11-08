@@ -16,29 +16,44 @@ export type Database = {
     Tables: {
       aplicacoes_checklist: {
         Row: {
+          assinatura_cliente: string | null
+          assinatura_rt: string | null
           cliente_id: string
           created_at: string | null
           data_aplicacao: string | null
+          data_proxima_inspecao: string | null
           id: string
           modelo_id: string
+          parecer_conclusivo: string | null
+          responsavel_inspecao: string | null
           respostas_json: Json
           tenant_id: string
         }
         Insert: {
+          assinatura_cliente?: string | null
+          assinatura_rt?: string | null
           cliente_id: string
           created_at?: string | null
           data_aplicacao?: string | null
+          data_proxima_inspecao?: string | null
           id?: string
           modelo_id: string
+          parecer_conclusivo?: string | null
+          responsavel_inspecao?: string | null
           respostas_json?: Json
           tenant_id: string
         }
         Update: {
+          assinatura_cliente?: string | null
+          assinatura_rt?: string | null
           cliente_id?: string
           created_at?: string | null
           data_aplicacao?: string | null
+          data_proxima_inspecao?: string | null
           id?: string
           modelo_id?: string
+          parecer_conclusivo?: string | null
+          responsavel_inspecao?: string | null
           respostas_json?: Json
           tenant_id?: string
         }
@@ -77,6 +92,8 @@ export type Database = {
           email_cliente: string | null
           estado: string | null
           id: string
+          latitude: number | null
+          longitude: number | null
           nome_fantasia: string | null
           razao_social: string
           responsavel_legal: string | null
@@ -94,6 +111,8 @@ export type Database = {
           email_cliente?: string | null
           estado?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           nome_fantasia?: string | null
           razao_social: string
           responsavel_legal?: string | null
@@ -111,6 +130,8 @@ export type Database = {
           email_cliente?: string | null
           estado?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           nome_fantasia?: string | null
           razao_social?: string
           responsavel_legal?: string | null

@@ -11,7 +11,8 @@ import {
   ClipboardList, 
   FileCheck, 
   LogOut,
-  Shield
+  Shield,
+  Map
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -55,6 +56,7 @@ const Layout = ({ children }: LayoutProps) => {
   const navItems = [
     { icon: Home, label: "Dashboard", path: "/" },
     { icon: Users, label: "Clientes", path: "/clientes" },
+    { icon: Map, label: "Mapa de Clientes", path: "/mapa-clientes" },
     { icon: ClipboardList, label: "Criar Checklist", path: "/checklist-designer" },
     { icon: FileCheck, label: "Aplicar Checklist", path: "/aplicar-checklist" },
   ];

@@ -75,6 +75,25 @@ const Clientes = () => {
     }
   };
 
+  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
+      );
+      const data = await response.json();
+      if (data && data.length > 0) {
+        return {
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon),
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error("Erro ao geocodificar endereço:", error);
+      return null;
+    }
+  };
+
   const handleSave = async () => {
     if (!formData.razao_social || !formData.cnpj) {
       toast.error("Razão Social e CNPJ são obrigatórios");
@@ -90,11 +109,25 @@ const Clientes = () => {
       return;
     }
 
+    let latitude: number | null = null;
+    let longitude: number | null = null;
+
+    if (formData.rua && formData.cidade && formData.estado) {
+      const endereco = `${formData.rua}, ${formData.bairro || ""}, ${formData.cidade}, ${formData.estado}, Brasil`;
+      const coords = await geocodeAddress(endereco);
+      if (coords) {
+        latitude = coords.lat;
+        longitude = coords.lng;
+      }
+    }
+
     const dataToSave: any = {
       ...formData,
       tenant_id: user.id,
       razao_social: formData.razao_social!,
       cnpj: formData.cnpj!,
+      latitude,
+      longitude,
     };
 
     const { error } = editingId
