@@ -6,13 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FileCheck, Building2, Save, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import jsPDF from "jspdf";
+import Select from "react-select";
 interface Cliente {
   id: string;
   razao_social: string;
@@ -26,7 +26,7 @@ interface Cliente {
 }
 interface CampoChecklist {
   id: string;
-  tipo: "titulo" | "descricao" | "sim_nao_na" | "observacao" | "foto" | "multipla_escolha";
+  tipo: "titulo" | "descricao" | "sim_nao_na" | "observacao" | "foto" | "multipla_escolha" | "data" | "outros";
   label: string;
   opcoes?: string[];
 }
@@ -97,86 +97,157 @@ const AplicarChecklist = () => {
   };
   const gerarPDF = async () => {
     if (!clienteAtual || !modeloAtual) return;
+    
     const pdf = new jsPDF();
-    let yPos = 20;
-    pdf.setFontSize(16);
-    pdf.text("Relatório de Inspeção Sanitária", 105, yPos, {
-      align: "center"
-    });
-    yPos += 15;
-    pdf.setFontSize(12);
-    pdf.text(`Modelo: ${modeloAtual.nome_modelo}`, 20, yPos);
-    yPos += 10;
-    pdf.setFontSize(10);
-    pdf.text(`Razão Social: ${clienteAtual.razao_social}`, 20, yPos);
-    yPos += 6;
-    pdf.text(`CNPJ: ${clienteAtual.cnpj}`, 20, yPos);
-    yPos += 6;
-    const endereco = [clienteAtual.rua, clienteAtual.bairro, clienteAtual.cidade, clienteAtual.estado].filter(Boolean).join(", ");
-    pdf.text(`Endereço: ${endereco}`, 20, yPos);
-    yPos += 6;
-    pdf.text(`Responsável Legal: ${clienteAtual.responsavel_legal || "N/A"}`, 20, yPos);
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 20;
+    const contentWidth = pageWidth - 2 * margin;
+    let yPos = margin;
+
+    // Header
+    pdf.setFontSize(18);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Relatório de Inspeção Sanitária", pageWidth / 2, yPos, { align: "center" });
     yPos += 12;
-    pdf.text("Respostas:", 20, yPos);
+
+    // Checklist name (removed "Modelo:")
+    pdf.setFontSize(14);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(modeloAtual.nome_modelo, pageWidth / 2, yPos, { align: "center" });
+    yPos += 15;
+
+    // Client info with better formatting
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Razão Social:", margin, yPos);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(clienteAtual.razao_social, margin + 35, yPos);
+    yPos += 6;
+
+    pdf.setFont("helvetica", "bold");
+    pdf.text("CNPJ:", margin, yPos);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(clienteAtual.cnpj, margin + 35, yPos);
+    yPos += 6;
+
+    const endereco = [clienteAtual.rua, clienteAtual.bairro, clienteAtual.cidade, clienteAtual.estado].filter(Boolean).join(", ");
+    if (endereco) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Endereço:", margin, yPos);
+      pdf.setFont("helvetica", "normal");
+      const enderecoLines = pdf.splitTextToSize(endereco, contentWidth - 35);
+      pdf.text(enderecoLines, margin + 35, yPos);
+      yPos += 6 * enderecoLines.length;
+    }
+
+    if (clienteAtual.responsavel_legal) {
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Responsável Legal:", margin, yPos);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(clienteAtual.responsavel_legal, margin + 45, yPos);
+      yPos += 10;
+    }
+
+    // Responses section with column organization
+    pdf.setFontSize(11);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Respostas:", margin, yPos);
     yPos += 8;
-    (modeloAtual.estrutura_json?.campos || []).forEach(campo => {
-      if (yPos > 270) {
+
+    (modeloAtual.estrutura_json?.campos || []).forEach((campo, index) => {
+      if (yPos > pageHeight - 40) {
         pdf.addPage();
-        yPos = 20;
+        yPos = margin;
       }
+
+      pdf.setFontSize(9);
+      
       if (campo.tipo === "titulo") {
-        pdf.setFontSize(11);
         pdf.setFont("helvetica", "bold");
-        pdf.text(campo.label, 20, yPos);
-        yPos += 8;
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(10);
+        pdf.setFontSize(11);
+        const tituloLines = pdf.splitTextToSize(campo.label, contentWidth);
+        pdf.text(tituloLines, margin, yPos);
+        yPos += 6 * tituloLines.length + 2;
+        pdf.setFontSize(9);
       } else if (campo.tipo === "descricao") {
-        pdf.text(campo.label, 20, yPos);
-        yPos += 6;
+        pdf.setFont("helvetica", "italic");
+        const descLines = pdf.splitTextToSize(campo.label, contentWidth - 5);
+        pdf.text(descLines, margin + 5, yPos);
+        yPos += 5 * descLines.length + 2;
       } else {
+        pdf.setFont("helvetica", "bold");
+        const perguntaLines = pdf.splitTextToSize(`${index + 1}. ${campo.label}`, contentWidth - 10);
+        pdf.text(perguntaLines, margin + 5, yPos);
+        yPos += 5 * perguntaLines.length;
+
         const resposta = respostas[campo.id];
-        pdf.text(`${campo.label}: ${resposta || "Não respondido"}`, 20, yPos);
-        yPos += 6;
+        pdf.setFont("helvetica", "normal");
+        const respostaText = resposta !== undefined ? String(resposta) : "Não respondido";
+        const respostaLines = pdf.splitTextToSize(`R: ${respostaText}`, contentWidth - 10);
+        pdf.text(respostaLines, margin + 5, yPos);
+        yPos += 5 * respostaLines.length + 3;
       }
     });
+
+    // Conclusive opinion
     if (parecerConclusivo) {
-      yPos += 6;
+      if (yPos > pageHeight - 50) {
+        pdf.addPage();
+        yPos = margin;
+      }
+      yPos += 5;
+      pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Parecer Conclusivo:", 20, yPos);
+      pdf.text("Parecer Conclusivo:", margin, yPos);
       yPos += 6;
       pdf.setFont("helvetica", "normal");
-      const linhas = pdf.splitTextToSize(parecerConclusivo, 170);
-      pdf.text(linhas, 20, yPos);
-      yPos += linhas.length * 6 + 6;
+      const parecerLines = pdf.splitTextToSize(parecerConclusivo, contentWidth);
+      pdf.text(parecerLines, margin, yPos);
+      yPos += 6 * parecerLines.length + 5;
     }
+
+    // Next inspection date
     if (dataProximaInspecao) {
-      pdf.text(`Data da Próxima Inspeção: ${dataProximaInspecao}`, 20, yPos);
-      yPos += 10;
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Próxima Inspeção:", margin, yPos);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(new Date(dataProximaInspecao).toLocaleDateString("pt-BR"), margin + 40, yPos);
+      yPos += 8;
     }
+
+    // Inspector name
     if (nomeRT) {
-      pdf.text(`Responsável pela Inspeção: ${nomeRT}`, 20, yPos);
-      yPos += 10;
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Responsável pela Inspeção:", margin, yPos);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(nomeRT, margin + 60, yPos);
+      yPos += 15;
     }
-    if (assinaturaRT) {
-      if (yPos > 240) {
+
+    // Signatures
+    if (assinaturaRT || assinaturaCliente) {
+      if (yPos > pageHeight - 80) {
         pdf.addPage();
-        yPos = 20;
+        yPos = margin;
       }
-      pdf.text("Assinatura do RT:", 20, yPos);
-      yPos += 6;
-      pdf.addImage(assinaturaRT, "PNG", 20, yPos, 60, 20);
-      yPos += 26;
-    }
-    if (assinaturaCliente) {
-      if (yPos > 240) {
-        pdf.addPage();
-        yPos = 20;
+
+      if (assinaturaRT) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Assinatura do RT:", margin, yPos);
+        yPos += 5;
+        pdf.addImage(assinaturaRT, "PNG", margin, yPos, 60, 20);
+        yPos += 30;
       }
-      pdf.text("Assinatura do Representante:", 20, yPos);
-      yPos += 6;
-      pdf.addImage(assinaturaCliente, "PNG", 20, yPos, 60, 20);
+
+      if (assinaturaCliente) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Assinatura do Representante:", margin, yPos);
+        yPos += 5;
+        pdf.addImage(assinaturaCliente, "PNG", margin, yPos, 60, 20);
+      }
     }
+
     pdf.save(`relatorio_${clienteAtual.razao_social}_${new Date().toISOString().split("T")[0]}.pdf`);
     toast.success("PDF gerado com sucesso!");
   };
@@ -231,37 +302,41 @@ const AplicarChecklist = () => {
   return <Layout>
       <div className="p-6 md:p-8 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Aplicar Checklist</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Fazer Inspeção</h1>
           <p className="text-muted-foreground">Preencha o checklist para um cliente</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <Label>Selecione o Cliente</Label>
-            <Select value={clienteSelecionado} onValueChange={setClienteSelecionado}>
-              <SelectTrigger>
-                <SelectValue placeholder="Escolha um cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                {clientes.map(cliente => <SelectItem key={cliente.id} value={cliente.id}>
-                    {cliente.nome_fantasia || cliente.razao_social}
-                  </SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Select
+              value={clientes.find(c => c.id === clienteSelecionado) ? { value: clienteSelecionado, label: clientes.find(c => c.id === clienteSelecionado)!.nome_fantasia || clientes.find(c => c.id === clienteSelecionado)!.razao_social } : null}
+              onChange={(option) => setClienteSelecionado(option?.value || "")}
+              options={clientes.map(cliente => ({
+                value: cliente.id,
+                label: cliente.nome_fantasia || cliente.razao_social
+              }))}
+              placeholder="Digite para buscar..."
+              isClearable
+              className="react-select-container"
+              classNamePrefix="react-select"
+            />
           </div>
 
           <div>
             <Label>Selecione o Modelo de Checklist</Label>
-            <Select value={modeloSelecionado} onValueChange={setModeloSelecionado}>
-              <SelectTrigger>
-                <SelectValue placeholder="Escolha um modelo" />
-              </SelectTrigger>
-              <SelectContent>
-                {modelos.map(modelo => <SelectItem key={modelo.id} value={modelo.id}>
-                    {modelo.nome_modelo}
-                  </SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Select
+              value={modelos.find(m => m.id === modeloSelecionado) ? { value: modeloSelecionado, label: modelos.find(m => m.id === modeloSelecionado)!.nome_modelo } : null}
+              onChange={(option) => setModeloSelecionado(option?.value || "")}
+              options={modelos.map(modelo => ({
+                value: modelo.id,
+                label: modelo.nome_modelo
+              }))}
+              placeholder="Digite para buscar..."
+              isClearable
+              className="react-select-container"
+              classNamePrefix="react-select"
+            />
           </div>
         </div>
 
@@ -329,6 +404,16 @@ const AplicarChecklist = () => {
                     {campo.tipo === "observacao" && <div className="space-y-2">
                         <Label className="text-base">{campo.label}</Label>
                         <Textarea value={respostas[campo.id] || ""} onChange={e => handleResposta(campo.id, e.target.value)} placeholder="Digite suas observações..." rows={3} />
+                      </div>}
+
+                    {campo.tipo === "outros" && <div className="space-y-2">
+                        <Label className="text-base">{campo.label}</Label>
+                        <Input value={respostas[campo.id] || ""} onChange={e => handleResposta(campo.id, e.target.value)} placeholder="Digite aqui..." />
+                      </div>}
+
+                    {campo.tipo === "data" && <div className="space-y-2">
+                        <Label className="text-base">{campo.label}</Label>
+                        <Input type="date" value={respostas[campo.id] || ""} onChange={e => handleResposta(campo.id, e.target.value)} />
                       </div>}
 
                     {campo.tipo === "multipla_escolha" && campo.opcoes && <div className="space-y-2">

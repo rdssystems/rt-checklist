@@ -12,7 +12,9 @@ import {
   FileCheck, 
   LogOut,
   Shield,
-  Map
+  Map,
+  Settings as SettingsIcon,
+  CheckSquare
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -25,12 +27,16 @@ const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [companyName, setCompanyName] = useState("Vigilância");
+  const [logoUrl, setLogoUrl] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (!session) {
         navigate("/auth");
+      } else {
+        loadSettings(session.user.id);
       }
     });
 
@@ -38,11 +44,26 @@ const Layout = ({ children }: LayoutProps) => {
       setUser(session?.user ?? null);
       if (!session && event === "SIGNED_OUT") {
         navigate("/auth");
+      } else if (session) {
+        loadSettings(session.user.id);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const loadSettings = async (userId: string) => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("company_name, logo_url")
+      .eq("id", userId)
+      .maybeSingle();
+    
+    if (data) {
+      setCompanyName(data.company_name || "Vigilância");
+      setLogoUrl(data.logo_url || "");
+    }
+  };
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -55,10 +76,12 @@ const Layout = ({ children }: LayoutProps) => {
 
   const navItems = [
     { icon: Home, label: "Dashboard", path: "/" },
+    { icon: FileCheck, label: "Fazer Inspeção", path: "/aplicar-checklist" },
     { icon: Users, label: "Clientes", path: "/clientes" },
     { icon: Map, label: "Mapa de Clientes", path: "/mapa-clientes" },
     { icon: ClipboardList, label: "Criar Checklist", path: "/checklist-designer" },
-    { icon: FileCheck, label: "Aplicar Checklist", path: "/aplicar-checklist" },
+    { icon: CheckSquare, label: "Checklists Prontos", path: "/checklists-prontos" },
+    { icon: SettingsIcon, label: "Configurações", path: "/settings" },
   ];
 
   const NavContent = () => (
@@ -99,11 +122,15 @@ const Layout = ({ children }: LayoutProps) => {
       {/* Sidebar Desktop */}
       <aside className="hidden md:flex w-64 bg-card border-r border-border flex-col p-4">
         <div className="flex items-center gap-3 mb-8 pb-4 border-b border-border">
-          <div className="bg-gradient-primary p-2 rounded-lg">
-            <Shield className="w-6 h-6 text-primary-foreground" />
-          </div>
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-lg" />
+          ) : (
+            <div className="bg-gradient-primary p-2 rounded-lg">
+              <Shield className="w-6 h-6 text-primary-foreground" />
+            </div>
+          )}
           <div>
-            <h1 className="font-bold text-lg">Vigilância</h1>
+            <h1 className="font-bold text-lg">{companyName}</h1>
             <p className="text-xs text-muted-foreground">Sanitária RT</p>
           </div>
         </div>
@@ -116,11 +143,15 @@ const Layout = ({ children }: LayoutProps) => {
       <div className="md:hidden fixed top-0 left-0 right-0 bg-card border-b border-border z-50">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-primary p-2 rounded-lg">
-              <Shield className="w-5 h-5 text-primary-foreground" />
-            </div>
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded-lg" />
+            ) : (
+              <div className="bg-gradient-primary p-2 rounded-lg">
+                <Shield className="w-5 h-5 text-primary-foreground" />
+              </div>
+            )}
             <div>
-              <h1 className="font-bold">Vigilância Sanitária</h1>
+              <h1 className="font-bold">{companyName} Sanitária</h1>
             </div>
           </div>
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>

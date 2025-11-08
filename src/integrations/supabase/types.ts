@@ -186,21 +186,27 @@ export type Database = {
       }
       profiles: {
         Row: {
+          company_name: string | null
           created_at: string | null
           email: string
           id: string
+          logo_url: string | null
           nome_rt: string
         }
         Insert: {
+          company_name?: string | null
           created_at?: string | null
           email: string
           id: string
+          logo_url?: string | null
           nome_rt: string
         }
         Update: {
+          company_name?: string | null
           created_at?: string | null
           email?: string
           id?: string
+          logo_url?: string | null
           nome_rt?: string
         }
         Relationships: []

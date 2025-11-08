@@ -9,6 +9,8 @@ import Clientes from "./pages/Clientes";
 import MapaClientes from "./pages/MapaClientes";
 import ChecklistDesigner from "./pages/ChecklistDesigner";
 import AplicarChecklist from "./pages/AplicarChecklist";
+import ChecklistsProntos from "./pages/ChecklistsProntos";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +28,8 @@ const App = () => (
           <Route path="/mapa-clientes" element={<MapaClientes />} />
           <Route path="/checklist-designer" element={<ChecklistDesigner />} />
           <Route path="/aplicar-checklist" element={<AplicarChecklist />} />
+          <Route path="/checklists-prontos" element={<ChecklistsProntos />} />
+          <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

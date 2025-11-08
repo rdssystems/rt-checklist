@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 interface FieldItem {
   id: string;
-  tipo: "titulo" | "descricao" | "sim_nao_na" | "observacao" | "foto" | "multipla_escolha" | "data";
+  tipo: "titulo" | "descricao" | "sim_nao_na" | "observacao" | "foto" | "multipla_escolha" | "data" | "outros";
   label: string;
   opcoes?: string[];
 }
@@ -59,7 +59,7 @@ const ChecklistDesigner = () => {
     const novoCampo: FieldItem = {
       id: crypto.randomUUID(),
       tipo,
-      label: tipo === "titulo" ? "Título sem nome" : tipo === "descricao" ? "Descrição" : "Pergunta sem título",
+      label: "",
       opcoes: tipo === "multipla_escolha" ? ["Opção 1"] : undefined,
     };
     setCampos([...campos, novoCampo]);
@@ -228,6 +228,7 @@ const ChecklistDesigner = () => {
       foto: "Foto/Anexo",
       multipla_escolha: "Múltipla Escolha",
       data: "Data",
+      outros: "Outros",
     };
     return labels[tipo];
   };
@@ -305,6 +306,7 @@ const ChecklistDesigner = () => {
                                   <SelectItem value="observacao">Observação</SelectItem>
                                   <SelectItem value="multipla_escolha">Múltipla Escolha</SelectItem>
                                   <SelectItem value="data">Data</SelectItem>
+                                  <SelectItem value="outros">Outros</SelectItem>
                                   <SelectItem value="foto">Foto</SelectItem>
                                 </SelectContent>
                               </Select>
@@ -443,6 +445,14 @@ const ChecklistDesigner = () => {
                     >
                       <Plus className="w-4 h-4 mr-1" />
                       Data
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addCampo("outros")}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Outros
                     </Button>
                     <Button
                       variant="outline"
