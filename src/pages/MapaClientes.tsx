@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import Layout from "@/components/Layout";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface Cliente {
   id: string;
@@ -21,22 +23,11 @@ interface Cliente {
 }
 
 const MapaClientes = () => {
-  const navigate = useNavigate();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [mapboxToken, setMapboxToken] = useState("");
   const [tokenSaved, setTokenSaved] = useState(false);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate("/auth");
-      }
-    };
-    checkAuth();
-  }, [navigate]);
 
   useEffect(() => {
     const fetchClientes = async () => {
@@ -121,23 +112,26 @@ const MapaClientes = () => {
 
   if (!tokenSaved) {
     return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-md mx-auto mt-20">
-          <div className="bg-card border border-border rounded-lg p-6 shadow-lg">
-            <h2 className="text-2xl font-bold text-foreground mb-4">Configurar Mapbox</h2>
-            <p className="text-muted-foreground mb-6">
-              Para usar o mapa de clientes, você precisa inserir seu token público do Mapbox.
-              Você pode obtê-lo em{" "}
-              <a
-                href="https://mapbox.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                mapbox.com
-              </a>
-            </p>
-            <div className="space-y-4">
+      <Layout>
+        <div className="p-6 md:p-8 space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Configurar Mapa</h1>
+            <p className="text-muted-foreground">Configure seu token do Mapbox para visualizar clientes</p>
+          </div>
+          <Card className="max-w-2xl shadow-md">
+            <CardContent className="pt-6 space-y-4">
+              <p className="text-muted-foreground">
+                Para usar o mapa de clientes, você precisa inserir seu token público do Mapbox.
+                Você pode obtê-lo em{" "}
+                <a
+                  href="https://mapbox.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  mapbox.com
+                </a>
+              </p>
               <div>
                 <Label htmlFor="mapbox-token">Token Público do Mapbox</Label>
                 <Input
@@ -149,43 +143,51 @@ const MapaClientes = () => {
                   className="mt-1"
                 />
               </div>
-              <button
+              <Button
                 onClick={handleTokenSubmit}
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md font-medium"
+                className="w-full bg-gradient-accent"
               >
                 Salvar e Carregar Mapa
-              </button>
-            </div>
-          </div>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   if (clientes.length === 0) {
     return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-foreground mb-6">Mapa de Clientes</h1>
-          <div className="bg-card border border-border rounded-lg p-8 text-center">
-            <p className="text-muted-foreground">
-              Nenhum cliente com localização cadastrada ainda.
-            </p>
+      <Layout>
+        <div className="p-6 md:p-8 space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Mapa de Clientes</h1>
+            <p className="text-muted-foreground">Visualize a localização de todos os seus clientes</p>
           </div>
+          <Card className="shadow-md">
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground">
+                Nenhum cliente com localização cadastrada ainda.
+              </p>
+            </CardContent>
+          </Card>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-foreground mb-6">Mapa de Clientes</h1>
-        <div className="bg-card border border-border rounded-lg overflow-hidden shadow-lg" style={{ height: "calc(100vh - 200px)" }}>
-          <div ref={mapContainer} className="w-full h-full" />
+    <Layout>
+      <div className="p-6 md:p-8 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Mapa de Clientes</h1>
+          <p className="text-muted-foreground">Visualize a localização de todos os seus clientes</p>
+        </div>
+        <div className="h-[600px] w-full rounded-lg overflow-hidden border border-border shadow-md">
+          <div ref={mapContainer} className="h-full w-full" />
         </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 

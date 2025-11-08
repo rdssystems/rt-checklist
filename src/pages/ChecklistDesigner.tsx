@@ -8,25 +8,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, MoveUp, MoveDown, ClipboardList, Save } from "lucide-react";
+import { Plus, Trash2, MoveUp, MoveDown, ClipboardList, Save, GripVertical, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 interface FieldItem {
   id: string;
-  tipo: "titulo" | "texto" | "sim_nao_na" | "observacao" | "foto";
+  tipo: "titulo" | "descricao" | "sim_nao_na" | "observacao" | "foto" | "multipla_escolha" | "data";
   label: string;
+  opcoes?: string[];
 }
 
 interface Secao {
   id: string;
-  titulo: string;
-  itens: FieldItem[];
+  campos: FieldItem[];
 }
 
 interface Modelo {
   id: string;
   nome_modelo: string;
-  estrutura_json: { secoes: Secao[] };
+  estrutura_json: { campos: FieldItem[] };
   created_at: string;
 }
 
@@ -34,7 +34,7 @@ const ChecklistDesigner = () => {
   const [modelos, setModelos] = useState<Modelo[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [nomeModelo, setNomeModelo] = useState("");
-  const [secoes, setSecoes] = useState<Secao[]>([]);
+  const [campos, setCampos] = useState<FieldItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -55,84 +55,97 @@ const ChecklistDesigner = () => {
     }
   };
 
-  const addSecao = () => {
-    const novaSecao: Secao = {
-      id: crypto.randomUUID(),
-      titulo: "Nova Seção",
-      itens: [],
-    };
-    setSecoes([...secoes, novaSecao]);
-  };
-
-  const removeSecao = (secaoId: string) => {
-    setSecoes(secoes.filter((s) => s.id !== secaoId));
-  };
-
-  const updateSecaoTitulo = (secaoId: string, titulo: string) => {
-    setSecoes(
-      secoes.map((s) => (s.id === secaoId ? { ...s, titulo } : s))
-    );
-  };
-
-  const addItem = (secaoId: string, tipo: FieldItem["tipo"]) => {
-    const novoItem: FieldItem = {
+  const addCampo = (tipo: FieldItem["tipo"]) => {
+    const novoCampo: FieldItem = {
       id: crypto.randomUUID(),
       tipo,
-      label: "Novo Item",
+      label: tipo === "titulo" ? "Título sem nome" : tipo === "descricao" ? "Descrição" : "Pergunta sem título",
+      opcoes: tipo === "multipla_escolha" ? ["Opção 1"] : undefined,
     };
-
-    setSecoes(
-      secoes.map((s) =>
-        s.id === secaoId ? { ...s, itens: [...s.itens, novoItem] } : s
-      )
-    );
+    setCampos([...campos, novoCampo]);
   };
 
-  const removeItem = (secaoId: string, itemId: string) => {
-    setSecoes(
-      secoes.map((s) =>
-        s.id === secaoId
-          ? { ...s, itens: s.itens.filter((i) => i.id !== itemId) }
-          : s
-      )
-    );
+  const removeCampo = (campoId: string) => {
+    setCampos(campos.filter((c) => c.id !== campoId));
   };
 
-  const updateItemLabel = (secaoId: string, itemId: string, label: string) => {
-    setSecoes(
-      secoes.map((s) =>
-        s.id === secaoId
+  const duplicateCampo = (campoId: string) => {
+    const campo = campos.find((c) => c.id === campoId);
+    if (campo) {
+      const novoCampo = { ...campo, id: crypto.randomUUID() };
+      const index = campos.findIndex((c) => c.id === campoId);
+      const novosCampos = [...campos];
+      novosCampos.splice(index + 1, 0, novoCampo);
+      setCampos(novosCampos);
+    }
+  };
+
+  const updateCampoLabel = (campoId: string, label: string) => {
+    setCampos(campos.map((c) => (c.id === campoId ? { ...c, label } : c)));
+  };
+
+  const updateCampoTipo = (campoId: string, tipo: FieldItem["tipo"]) => {
+    setCampos(
+      campos.map((c) =>
+        c.id === campoId
           ? {
-              ...s,
-              itens: s.itens.map((i) => (i.id === itemId ? { ...i, label } : i)),
+              ...c,
+              tipo,
+              opcoes: tipo === "multipla_escolha" ? ["Opção 1"] : undefined,
             }
-          : s
+          : c
       )
     );
   };
 
-  const moveItem = (secaoId: string, itemId: string, direction: "up" | "down") => {
-    setSecoes(
-      secoes.map((s) => {
-        if (s.id !== secaoId) return s;
+  const moveCampo = (campoId: string, direction: "up" | "down") => {
+    const index = campos.findIndex((c) => c.id === campoId);
+    if (
+      (direction === "up" && index === 0) ||
+      (direction === "down" && index === campos.length - 1)
+    ) {
+      return;
+    }
 
-        const index = s.itens.findIndex((i) => i.id === itemId);
-        if (
-          (direction === "up" && index === 0) ||
-          (direction === "down" && index === s.itens.length - 1)
-        ) {
-          return s;
-        }
+    const novosCampos = [...campos];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    [novosCampos[index], novosCampos[targetIndex]] = [
+      novosCampos[targetIndex],
+      novosCampos[index],
+    ];
+    setCampos(novosCampos);
+  };
 
-        const newItens = [...s.itens];
-        const targetIndex = direction === "up" ? index - 1 : index + 1;
-        [newItens[index], newItens[targetIndex]] = [
-          newItens[targetIndex],
-          newItens[index],
-        ];
+  const addOpcao = (campoId: string) => {
+    setCampos(
+      campos.map((c) =>
+        c.id === campoId && c.opcoes
+          ? { ...c, opcoes: [...c.opcoes, `Opção ${c.opcoes.length + 1}`] }
+          : c
+      )
+    );
+  };
 
-        return { ...s, itens: newItens };
-      })
+  const removeOpcao = (campoId: string, opcaoIndex: number) => {
+    setCampos(
+      campos.map((c) =>
+        c.id === campoId && c.opcoes
+          ? { ...c, opcoes: c.opcoes.filter((_, i) => i !== opcaoIndex) }
+          : c
+      )
+    );
+  };
+
+  const updateOpcao = (campoId: string, opcaoIndex: number, valor: string) => {
+    setCampos(
+      campos.map((c) =>
+        c.id === campoId && c.opcoes
+          ? {
+              ...c,
+              opcoes: c.opcoes.map((o, i) => (i === opcaoIndex ? valor : o)),
+            }
+          : c
+      )
     );
   };
 
@@ -142,8 +155,8 @@ const ChecklistDesigner = () => {
       return;
     }
 
-    if (secoes.length === 0) {
-      toast.error("Adicione pelo menos uma seção");
+    if (campos.length === 0) {
+      toast.error("Adicione pelo menos um campo");
       return;
     }
 
@@ -158,7 +171,7 @@ const ChecklistDesigner = () => {
 
     const dataToSave: any = {
       nome_modelo: nomeModelo,
-      estrutura_json: { secoes },
+      estrutura_json: { campos },
       tenant_id: user.id,
     };
 
@@ -174,7 +187,7 @@ const ChecklistDesigner = () => {
       toast.success(editingId ? "Modelo atualizado!" : "Modelo criado!");
       setDialogOpen(false);
       setNomeModelo("");
-      setSecoes([]);
+      setCampos([]);
       setEditingId(null);
       fetchModelos();
     }
@@ -197,11 +210,11 @@ const ChecklistDesigner = () => {
     if (modelo) {
       setEditingId(modelo.id);
       setNomeModelo(modelo.nome_modelo);
-      setSecoes(modelo.estrutura_json.secoes);
+      setCampos(modelo.estrutura_json.campos);
     } else {
       setEditingId(null);
       setNomeModelo("");
-      setSecoes([]);
+      setCampos([]);
     }
     setDialogOpen(true);
   };
@@ -209,10 +222,12 @@ const ChecklistDesigner = () => {
   const getTipoLabel = (tipo: FieldItem["tipo"]) => {
     const labels = {
       titulo: "Título",
-      texto: "Texto",
+      descricao: "Descrição",
       sim_nao_na: "SIM/NÃO/NA",
       observacao: "Observação",
       foto: "Foto/Anexo",
+      multipla_escolha: "Múltipla Escolha",
+      data: "Data",
     };
     return labels[tipo];
   };
@@ -236,7 +251,7 @@ const ChecklistDesigner = () => {
               <DialogHeader>
                 <DialogTitle>{editingId ? "Editar Modelo" : "Novo Modelo de Checklist"}</DialogTitle>
                 <DialogDescription>
-                  Construa seu formulário adicionando seções e campos
+                  Construa seu formulário no estilo Google Forms
                 </DialogDescription>
               </DialogHeader>
 
@@ -248,133 +263,196 @@ const ChecklistDesigner = () => {
                     value={nomeModelo}
                     onChange={(e) => setNomeModelo(e.target.value)}
                     placeholder="Ex: Checklist de Cozinha Industrial"
+                    className="text-lg"
                   />
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">Seções</h3>
-                    <Button variant="outline" size="sm" onClick={addSecao}>
-                      <Plus className="w-4 h-4 mr-1" />
-                      Adicionar Seção
-                    </Button>
-                  </div>
+                <div className="space-y-3">
+                  {campos.map((campo, index) => (
+                    <Card key={campo.id} className="border-2 hover:border-primary/50 transition-colors">
+                      <CardContent className="pt-6 space-y-4">
+                        <div className="flex gap-3">
+                          <div className="flex flex-col gap-1 pt-2">
+                            <GripVertical className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                          <div className="flex-1 space-y-3">
+                            <div className="flex gap-2">
+                              <Input
+                                value={campo.label}
+                                onChange={(e) => updateCampoLabel(campo.id, e.target.value)}
+                                placeholder={
+                                  campo.tipo === "titulo"
+                                    ? "Título da seção"
+                                    : campo.tipo === "descricao"
+                                    ? "Texto descritivo"
+                                    : "Digite sua pergunta"
+                                }
+                                className={campo.tipo === "titulo" ? "text-xl font-semibold" : ""}
+                              />
+                              <Select
+                                value={campo.tipo}
+                                onValueChange={(value) =>
+                                  updateCampoTipo(campo.id, value as FieldItem["tipo"])
+                                }
+                              >
+                                <SelectTrigger className="w-[200px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="titulo">Título</SelectItem>
+                                  <SelectItem value="descricao">Descrição</SelectItem>
+                                  <SelectItem value="sim_nao_na">SIM/NÃO/NA</SelectItem>
+                                  <SelectItem value="observacao">Observação</SelectItem>
+                                  <SelectItem value="multipla_escolha">Múltipla Escolha</SelectItem>
+                                  <SelectItem value="data">Data</SelectItem>
+                                  <SelectItem value="foto">Foto</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
 
-                  {secoes.map((secao, secaoIdx) => (
-                    <Card key={secao.id} className="border-2">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={secao.titulo}
-                            onChange={(e) => updateSecaoTitulo(secao.id, e.target.value)}
-                            className="font-semibold"
-                          />
+                            {campo.tipo === "multipla_escolha" && campo.opcoes && (
+                              <div className="pl-4 space-y-2">
+                                {campo.opcoes.map((opcao, opcaoIndex) => (
+                                  <div key={opcaoIndex} className="flex items-center gap-2">
+                                    <div className="w-4 h-4 rounded-full border-2 border-muted-foreground" />
+                                    <Input
+                                      value={opcao}
+                                      onChange={(e) =>
+                                        updateOpcao(campo.id, opcaoIndex, e.target.value)
+                                      }
+                                      placeholder={`Opção ${opcaoIndex + 1}`}
+                                      className="flex-1"
+                                    />
+                                    {campo.opcoes && campo.opcoes.length > 1 && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removeOpcao(campo.id, opcaoIndex)}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                ))}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => addOpcao(campo.id)}
+                                  className="ml-6"
+                                >
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Adicionar opção
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end gap-1 pt-2 border-t">
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => removeSecao(secao.id)}
-                            className="text-destructive"
+                            onClick={() => moveCampo(campo.id, "up")}
+                            disabled={index === 0}
+                            title="Mover para cima"
+                          >
+                            <MoveUp className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => moveCampo(campo.id, "down")}
+                            disabled={index === campos.length - 1}
+                            title="Mover para baixo"
+                          >
+                            <MoveDown className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => duplicateCampo(campo.id)}
+                            title="Duplicar"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeCampo(campo.id)}
+                            className="text-destructive hover:text-destructive"
+                            title="Excluir"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex gap-2 flex-wrap">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => addItem(secao.id, "titulo")}
-                          >
-                            + Título
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => addItem(secao.id, "texto")}
-                          >
-                            + Texto
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => addItem(secao.id, "sim_nao_na")}
-                          >
-                            + SIM/NÃO/NA
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => addItem(secao.id, "observacao")}
-                          >
-                            + Observação
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => addItem(secao.id, "foto")}
-                          >
-                            + Foto
-                          </Button>
-                        </div>
-
-                        {secao.itens.length > 0 && (
-                          <div className="space-y-2">
-                            {secao.itens.map((item, itemIdx) => (
-                              <div
-                                key={item.id}
-                                className="flex items-center gap-2 p-2 bg-muted rounded"
-                              >
-                                <span className="text-xs text-muted-foreground w-24">
-                                  {getTipoLabel(item.tipo)}
-                                </span>
-                                <Input
-                                  value={item.label}
-                                  onChange={(e) =>
-                                    updateItemLabel(secao.id, item.id, e.target.value)
-                                  }
-                                  className="flex-1"
-                                  size={1}
-                                />
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => moveItem(secao.id, item.id, "up")}
-                                    disabled={itemIdx === 0}
-                                  >
-                                    <MoveUp className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => moveItem(secao.id, item.id, "down")}
-                                    disabled={itemIdx === secao.itens.length - 1}
-                                  >
-                                    <MoveDown className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => removeItem(secao.id, item.id)}
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </CardContent>
                     </Card>
                   ))}
 
-                  {secoes.length === 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      Nenhuma seção adicionada. Clique em "Adicionar Seção" para começar.
+                  {campos.length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
+                      Nenhum campo adicionado. Use os botões abaixo para começar.
                     </div>
                   )}
+
+                  <div className="flex gap-2 flex-wrap justify-center pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addCampo("titulo")}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Título
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addCampo("descricao")}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Descrição
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addCampo("sim_nao_na")}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      SIM/NÃO/NA
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addCampo("observacao")}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Observação
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addCampo("multipla_escolha")}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Múltipla Escolha
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addCampo("data")}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Data
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addCampo("foto")}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Foto
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -405,7 +483,7 @@ const ChecklistDesigner = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome do Modelo</TableHead>
-                    <TableHead>Seções</TableHead>
+                    <TableHead>Campos</TableHead>
                     <TableHead>Criado em</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -414,7 +492,7 @@ const ChecklistDesigner = () => {
                   {modelos.map((modelo) => (
                     <TableRow key={modelo.id}>
                       <TableCell className="font-medium">{modelo.nome_modelo}</TableCell>
-                      <TableCell>{modelo.estrutura_json.secoes.length} seções</TableCell>
+                      <TableCell>{modelo.estrutura_json.campos.length} campos</TableCell>
                       <TableCell>
                         {new Date(modelo.created_at).toLocaleDateString("pt-BR")}
                       </TableCell>
