@@ -210,7 +210,7 @@ const ChecklistDesigner = () => {
     if (modelo) {
       setEditingId(modelo.id);
       setNomeModelo(modelo.nome_modelo);
-      setCampos(modelo.estrutura_json.campos);
+      setCampos(modelo.estrutura_json?.campos || []);
     } else {
       setEditingId(null);
       setNomeModelo("");
@@ -492,7 +492,7 @@ const ChecklistDesigner = () => {
                   {modelos.map((modelo) => (
                     <TableRow key={modelo.id}>
                       <TableCell className="font-medium">{modelo.nome_modelo}</TableCell>
-                      <TableCell>{modelo.estrutura_json.campos.length} campos</TableCell>
+                      <TableCell>{modelo.estrutura_json?.campos?.length || 0} campos</TableCell>
                       <TableCell>
                         {new Date(modelo.created_at).toLocaleDateString("pt-BR")}
                       </TableCell>
