@@ -133,7 +133,7 @@ const AplicarChecklist = () => {
     pdf.text("Respostas:", 20, yPos);
     yPos += 8;
 
-    modeloAtual.estrutura_json.campos.forEach((campo) => {
+    (modeloAtual.estrutura_json?.campos || []).forEach((campo) => {
       if (yPos > 270) {
         pdf.addPage();
         yPos = 20;
@@ -332,7 +332,7 @@ const AplicarChecklist = () => {
                 <CardTitle>Checklist: {modeloAtual.nome_modelo}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {modeloAtual.estrutura_json.campos.map((campo) => (
+                {(modeloAtual.estrutura_json?.campos || []).map((campo) => (
                   <div key={campo.id} className="space-y-2">
                     {campo.tipo === "titulo" && (
                       <h3 className="text-lg font-semibold text-primary mt-4">{campo.label}</h3>
