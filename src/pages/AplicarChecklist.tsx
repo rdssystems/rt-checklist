@@ -419,19 +419,44 @@ const AplicarChecklist = () => {
                     {campo.tipo === "multipla_escolha" && campo.opcoes && <div className="space-y-2">
                         <Label className="text-base">{campo.label}</Label>
                         <div className="space-y-2">
-                          {campo.opcoes.map((opcao, index) => <div key={index} className="flex items-center space-x-2">
-                              <Checkbox id={`${campo.id}-${index}`} checked={respostas[campo.id]?.includes(opcao) || false} onCheckedChange={checked => {
-                      const current = respostas[campo.id] || [];
-                      if (checked) {
-                        handleResposta(campo.id, [...current, opcao]);
-                      } else {
-                        handleResposta(campo.id, current.filter((v: string) => v !== opcao));
-                      }
-                    }} />
-                              <Label htmlFor={`${campo.id}-${index}`} className="cursor-pointer">
-                                {opcao}
-                              </Label>
-                            </div>)}
+                          {campo.opcoes.map((opcao, index) => {
+                            const isOutros = opcao.toLowerCase().includes("outros") || opcao.toLowerCase().includes("especificar");
+                            return (
+                              <div key={index}>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox 
+                                    id={`${campo.id}-${index}`} 
+                                    checked={respostas[campo.id]?.includes(opcao) || false} 
+                                    onCheckedChange={checked => {
+                                      const current = respostas[campo.id] || [];
+                                      if (checked) {
+                                        handleResposta(campo.id, [...current, opcao]);
+                                      } else {
+                                        handleResposta(campo.id, current.filter((v: string) => v !== opcao));
+                                        // Clear the text field if unchecking "Outros"
+                                        if (isOutros) {
+                                          handleResposta(`${campo.id}_outros_text`, "");
+                                        }
+                                      }
+                                    }} 
+                                  />
+                                  <Label htmlFor={`${campo.id}-${index}`} className="cursor-pointer">
+                                    {opcao}
+                                  </Label>
+                                </div>
+                                {isOutros && respostas[campo.id]?.includes(opcao) && (
+                                  <div className="ml-6 mt-2">
+                                    <Input 
+                                      placeholder="Especifique..."
+                                      value={respostas[`${campo.id}_outros_text`] || ""}
+                                      onChange={(e) => handleResposta(`${campo.id}_outros_text`, e.target.value)}
+                                      className="w-full"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>}
 

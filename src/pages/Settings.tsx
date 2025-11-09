@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, Building2 } from "lucide-react";
+import { Upload, Building2, Image as ImageIcon } from "lucide-react";
 
 const Settings = () => {
   const [companyName, setCompanyName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,6 +39,56 @@ const Settings = () => {
     if (data) {
       setCompanyName(data.company_name || "");
       setLogoUrl(data.logo_url || "");
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !userId) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error("Por favor, selecione apenas arquivos de imagem");
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("O arquivo deve ter no máximo 2MB");
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Delete old logo if exists
+      if (logoUrl) {
+        const oldPath = logoUrl.split('/').slice(-2).join('/');
+        await supabase.storage.from('logos').remove([oldPath]);
+      }
+
+      // Upload new file
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userId}/${Math.random()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('logos')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('logos')
+        .getPublicUrl(fileName);
+
+      setLogoUrl(publicUrl);
+      toast.success("Logo carregado com sucesso!");
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast.error("Erro ao fazer upload do logo");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -100,17 +151,52 @@ const Settings = () => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="logoUrl">URL do Logotipo</Label>
-              <Input
-                id="logoUrl"
-                placeholder="https://exemplo.com/logo.png"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Cole o link direto da imagem do seu logotipo
-              </p>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="logoUrl">URL do Logotipo</Label>
+                <Input
+                  id="logoUrl"
+                  placeholder="https://exemplo.com/logo.png"
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Cole o link direto da imagem do seu logotipo
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">OU</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="logoFile">Fazer Upload do Logotipo</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="logoFile"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    disabled={uploading}
+                    onClick={() => document.getElementById('logoFile')?.click()}
+                  >
+                    <ImageIcon className="w-4 h-4 mr-2" />
+                    {uploading ? "Enviando..." : "Escolher"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Máximo 2MB • PNG, JPG, WEBP
+                </p>
+              </div>
+
               {logoUrl && (
                 <div className="mt-4 p-4 border rounded-lg bg-muted/50">
                   <p className="text-sm font-medium mb-2">Prévia do Logotipo:</p>
