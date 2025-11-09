@@ -131,7 +131,6 @@ const Layout = ({ children }: LayoutProps) => {
           )}
           <div>
             <h1 className="font-bold text-lg">{companyName}</h1>
-            <p className="text-xs text-muted-foreground">Sanitária RT</p>
           </div>
         </div>
         <nav className="flex flex-col gap-2 flex-1">

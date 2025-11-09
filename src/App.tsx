@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import Clientes from "./pages/Clientes";
 import MapaClientes from "./pages/MapaClientes";
+import Settings from "./pages/Settings";
 import ChecklistDesigner from "./pages/ChecklistDesigner";
 import AplicarChecklist from "./pages/AplicarChecklist";
 import ChecklistsProntos from "./pages/ChecklistsProntos";
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/mapa-clientes" element={<MapaClientes />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/checklist-designer" element={<ChecklistDesigner />} />
           <Route path="/aplicar-checklist" element={<AplicarChecklist />} />
           <Route path="/checklists-prontos" element={<ChecklistsProntos />} />

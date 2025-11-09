@@ -404,7 +404,7 @@ const ChecklistDesigner = () => {
                       onClick={() => addCampo("titulo")}
                     >
                       <Plus className="w-4 h-4 mr-1" />
-                      Título
+                      Nova Seção
                     </Button>
                     <Button
                       variant="outline"

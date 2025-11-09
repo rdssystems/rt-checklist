@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileCheck, Download, Calendar, User, Building2 } from "lucide-react";
+import { FileCheck, Download, Calendar, User, Building2, Trash2, Search } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import jsPDF from "jspdf";
@@ -39,6 +40,8 @@ interface ChecklistPronto {
 const ChecklistsProntos = () => {
   const [checklists, setChecklists] = useState<ChecklistPronto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState<"all" | "checklist" | "empresa">("all");
 
   useEffect(() => {
     loadChecklists();
@@ -66,6 +69,39 @@ const ChecklistsProntos = () => {
     }
     setLoading(false);
   };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Deseja realmente excluir este checklist?")) return;
+
+    const { error } = await supabase
+      .from("aplicacoes_checklist")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Erro ao excluir checklist");
+    } else {
+      toast.success("Checklist excluído com sucesso!");
+      loadChecklists();
+    }
+  };
+
+  const filteredChecklists = checklists.filter((checklist) => {
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    
+    if (filterType === "checklist") {
+      return checklist.modelos_checklist.nome_modelo.toLowerCase().includes(searchLower);
+    } else if (filterType === "empresa") {
+      return checklist.clientes.razao_social.toLowerCase().includes(searchLower);
+    } else {
+      return (
+        checklist.modelos_checklist.nome_modelo.toLowerCase().includes(searchLower) ||
+        checklist.clientes.razao_social.toLowerCase().includes(searchLower)
+      );
+    }
+  });
 
   const generatePDF = async (checklist: ChecklistPronto) => {
     try {
@@ -213,11 +249,48 @@ const ChecklistsProntos = () => {
           </p>
         </div>
 
-        {checklists.length === 0 ? (
+        <div className="mb-6 flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar checklists..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant={filterType === "all" ? "default" : "outline"}
+              onClick={() => setFilterType("all")}
+              size="sm"
+            >
+              Todos
+            </Button>
+            <Button
+              variant={filterType === "checklist" ? "default" : "outline"}
+              onClick={() => setFilterType("checklist")}
+              size="sm"
+            >
+              Por Checklist
+            </Button>
+            <Button
+              variant={filterType === "empresa" ? "default" : "outline"}
+              onClick={() => setFilterType("empresa")}
+              size="sm"
+            >
+              Por Empresa
+            </Button>
+          </div>
+        </div>
+
+        {filteredChecklists.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <FileCheck className="w-16 h-16 text-muted-foreground mb-4" />
-              <p className="text-lg font-medium">Nenhum checklist aplicado ainda</p>
+              <p className="text-lg font-medium">
+                {checklists.length === 0 ? "Nenhum checklist aplicado ainda" : "Nenhum resultado encontrado"}
+              </p>
               <p className="text-sm text-muted-foreground mt-2">
                 Acesse "Fazer Inspeção" para aplicar um checklist
               </p>
@@ -225,15 +298,24 @@ const ChecklistsProntos = () => {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {checklists.map((checklist) => (
+            {filteredChecklists.map((checklist) => (
               <Card key={checklist.id}>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span>{checklist.modelos_checklist.nome_modelo}</span>
-                    <Button onClick={() => generatePDF(checklist)} size="sm">
-                      <Download className="w-4 h-4 mr-2" />
-                      Baixar PDF
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button onClick={() => generatePDF(checklist)} size="sm" variant="default">
+                        <Download className="w-4 h-4 mr-2" />
+                        Baixar PDF
+                      </Button>
+                      <Button 
+                        onClick={() => handleDelete(checklist.id)} 
+                        size="sm" 
+                        variant="destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </CardTitle>
                   <CardDescription className="space-y-1">
                     <div className="flex items-center gap-2">
