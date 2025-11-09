@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Building2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Building2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
 interface Cliente {
@@ -24,6 +24,8 @@ interface Cliente {
   email_cliente: string | null;
   responsavel_legal: string | null;
   cpf_responsavel: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 const Clientes = () => {
@@ -160,6 +162,40 @@ const Clientes = () => {
     }
   };
 
+  const handleGeocodeAll = async () => {
+    setLoading(true);
+    const clientesSemCoordenadas = clientes.filter(c => !c.latitude || !c.longitude);
+    
+    if (clientesSemCoordenadas.length === 0) {
+      toast.info("Todos os clientes já possuem coordenadas!");
+      setLoading(false);
+      return;
+    }
+
+    let atualizados = 0;
+    for (const cliente of clientesSemCoordenadas) {
+      if (cliente.rua && cliente.cidade && cliente.estado) {
+        const endereco = `${cliente.rua}, ${cliente.bairro || ""}, ${cliente.cidade}, ${cliente.estado}, Brasil`;
+        const coords = await geocodeAddress(endereco);
+        
+        if (coords) {
+          await supabase
+            .from("clientes")
+            .update({ latitude: coords.lat, longitude: coords.lng })
+            .eq("id", cliente.id);
+          atualizados++;
+        }
+        
+        // Delay para não sobrecarregar a API do Nominatim
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    toast.success(`${atualizados} de ${clientesSemCoordenadas.length} clientes geocodificados!`);
+    setLoading(false);
+    fetchClientes();
+  };
+
   const openDialog = (cliente?: Cliente) => {
     if (cliente) {
       setEditingId(cliente.id);
@@ -179,7 +215,16 @@ const Clientes = () => {
             <h1 className="text-3xl font-bold text-foreground mb-2">Clientes</h1>
             <p className="text-muted-foreground">Gerencie as empresas cadastradas</p>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleGeocodeAll} 
+              disabled={loading}
+              variant="outline"
+            >
+              <MapPin className="w-4 h-4 mr-2" />
+              {loading ? "Atualizando..." : "Atualizar Coordenadas"}
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button onClick={() => openDialog()} className="bg-gradient-primary">
                 <Plus className="w-4 h-4 mr-2" />
@@ -319,6 +364,7 @@ const Clientes = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <Card className="shadow-md">
