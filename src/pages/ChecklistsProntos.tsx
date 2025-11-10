@@ -105,6 +105,24 @@ const ChecklistsProntos = () => {
 
   const generatePDF = async (checklist: ChecklistPronto) => {
     try {
+      // Fetch logo and company name from profile
+      const { data: { user } } = await supabase.auth.getUser();
+      let logoUrl = "";
+      let companyName = "";
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("logo_url, company_name")
+          .eq("id", user.id)
+          .single();
+        
+        if (profile) {
+          logoUrl = profile.logo_url || "";
+          companyName = profile.company_name || "";
+        }
+      }
+      
       const pdf = new jsPDF();
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
@@ -112,52 +130,83 @@ const ChecklistsProntos = () => {
       const contentWidth = pageWidth - 2 * margin;
       let yPos = margin;
 
-      // Title
-      pdf.setFontSize(18);
+      // HEADER
+      // Add logo if available
+      if (logoUrl) {
+        try {
+          pdf.addImage(logoUrl, "PNG", margin, yPos, 30, 15);
+        } catch (e) {
+          console.error("Error adding logo:", e);
+        }
+      }
+      
+      // Company name and date on the right
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      if (companyName) {
+        pdf.text(companyName, pageWidth - margin, yPos, { align: "right" });
+      }
+      pdf.text(format(new Date(checklist.data_aplicacao), "dd/MM/yyyy"), pageWidth - margin, yPos + 5, { align: "right" });
+      
+      yPos += 20;
+
+      // Title - centered and bold
+      pdf.setFontSize(20);
       pdf.setFont("helvetica", "bold");
       pdf.text("Relatório de Inspeção Sanitária", pageWidth / 2, yPos, { align: "center" });
-      yPos += 15;
+      yPos += 8;
 
-      // Checklist name
+      // Subtitle - category/checklist name
       pdf.setFontSize(12);
       pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(100, 100, 100);
       pdf.text(checklist.modelos_checklist.nome_modelo, pageWidth / 2, yPos, { align: "center" });
+      pdf.setTextColor(0, 0, 0);
       yPos += 10;
 
-      // Client info section
+      // Separator line
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 10;
+
+      // CLIENT INFO BOX
+      pdf.setFillColor(245, 245, 245);
+      const boxHeight = checklist.clientes.responsavel_legal ? 28 : 22;
+      pdf.rect(margin, yPos, contentWidth, boxHeight, "F");
+      
+      yPos += 6;
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Razão Social: ", margin, yPos);
+      pdf.text("Razão Social:", margin + 3, yPos);
       pdf.setFont("helvetica", "normal");
-      pdf.text(checklist.clientes.razao_social, margin + 30, yPos);
-      yPos += 6;
+      pdf.text(checklist.clientes.razao_social, margin + 35, yPos);
+      yPos += 5;
 
       pdf.setFont("helvetica", "bold");
-      pdf.text("CNPJ: ", margin, yPos);
+      pdf.text("CNPJ:", margin + 3, yPos);
       pdf.setFont("helvetica", "normal");
-      pdf.text(checklist.clientes.cnpj, margin + 30, yPos);
-      yPos += 6;
+      pdf.text(checklist.clientes.cnpj, margin + 35, yPos);
+      yPos += 5;
 
       const endereco = `${checklist.clientes.rua}, ${checklist.clientes.bairro}, ${checklist.clientes.cidade}, ${checklist.clientes.estado}`;
       pdf.setFont("helvetica", "bold");
-      pdf.text("Endereço: ", margin, yPos);
+      pdf.text("Endereço:", margin + 3, yPos);
       pdf.setFont("helvetica", "normal");
-      const enderecoLines = pdf.splitTextToSize(endereco, contentWidth - 30);
-      pdf.text(enderecoLines, margin + 30, yPos);
-      yPos += 6 * enderecoLines.length;
+      const enderecoLines = pdf.splitTextToSize(endereco, contentWidth - 38);
+      pdf.text(enderecoLines, margin + 35, yPos);
+      yPos += 5 * enderecoLines.length;
 
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Responsável Legal: ", margin, yPos);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(checklist.clientes.responsavel_legal, margin + 45, yPos);
-      yPos += 10;
-
-      // Responses section
-      pdf.setFontSize(11);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Respostas:", margin, yPos);
+      if (checklist.clientes.responsavel_legal) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Responsável Legal:", margin + 3, yPos);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(checklist.clientes.responsavel_legal, margin + 48, yPos);
+        yPos += 5;
+      }
+      
       yPos += 8;
 
+      // RESPONSES SECTION
       const campos = checklist.modelos_checklist.estrutura_json?.campos || [];
       const respostas = checklist.respostas_json || {};
 
@@ -167,56 +216,140 @@ const ChecklistsProntos = () => {
           yPos = margin;
         }
 
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "bold");
-        const perguntaLines = pdf.splitTextToSize(`${index + 1}. ${campo.label}`, contentWidth - 10);
-        pdf.text(perguntaLines, margin + 5, yPos);
-        yPos += 5 * perguntaLines.length;
+        if (campo.tipo === "titulo") {
+          pdf.setFontSize(11);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(60, 60, 200);
+          const tituloLines = pdf.splitTextToSize(campo.label, contentWidth);
+          pdf.text(tituloLines, margin, yPos);
+          pdf.setTextColor(0, 0, 0);
+          yPos += 6 * tituloLines.length + 2;
+        } else if (campo.tipo === "descricao") {
+          pdf.setFontSize(9);
+          pdf.setFont("helvetica", "italic");
+          pdf.setTextColor(100, 100, 100);
+          const descLines = pdf.splitTextToSize(campo.label, contentWidth);
+          pdf.text(descLines, margin, yPos);
+          pdf.setTextColor(0, 0, 0);
+          yPos += 5 * descLines.length + 2;
+        } else {
+          pdf.setFontSize(9);
+          pdf.setFont("helvetica", "bold");
+          const perguntaLines = pdf.splitTextToSize(`${index + 1}. ${campo.label}`, contentWidth);
+          pdf.text(perguntaLines, margin, yPos);
+          yPos += 5 * perguntaLines.length;
 
-        pdf.setFont("helvetica", "normal");
-        const resposta = respostas[campo.id] || "Não respondido";
-        const respostaText = typeof resposta === "object" ? JSON.stringify(resposta) : String(resposta);
-        const respostaLines = pdf.splitTextToSize(`R: ${respostaText}`, contentWidth - 10);
-        pdf.text(respostaLines, margin + 5, yPos);
-        yPos += 5 * respostaLines.length + 3;
+          const resposta = respostas[campo.id];
+          const outrosText = respostas[`${campo.id}_outros_text`];
+          let respostaText = "Não respondido";
+          
+          if (Array.isArray(resposta)) {
+            respostaText = resposta.join(", ");
+            if (outrosText) {
+              respostaText += ` (${outrosText})`;
+            }
+          } else if (resposta !== undefined && resposta !== null && resposta !== "") {
+            respostaText = String(resposta);
+          }
+          
+          pdf.setFont("helvetica", "normal");
+          const respostaLines = pdf.splitTextToSize(`   ${respostaText}`, contentWidth);
+          pdf.text(respostaLines, margin, yPos);
+          yPos += 5 * respostaLines.length + 1;
+          
+          // Light separator
+          pdf.setDrawColor(230, 230, 230);
+          pdf.line(margin, yPos, pageWidth - margin, yPos);
+          yPos += 2;
+        }
       });
 
-      // Inspector info
-      if (checklist.responsavel_inspecao) {
+      // Conclusive opinion
+      if (checklist.parecer_conclusivo) {
         if (yPos > pageHeight - 50) {
           pdf.addPage();
           yPos = margin;
         }
         yPos += 5;
+        pdf.setFontSize(10);
         pdf.setFont("helvetica", "bold");
-        pdf.text("Responsável pela Inspeção: ", margin, yPos);
+        pdf.text("Parecer Conclusivo:", margin, yPos);
+        yPos += 6;
         pdf.setFont("helvetica", "normal");
-        pdf.text(checklist.responsavel_inspecao, margin + 60, yPos);
-        yPos += 10;
+        const parecerLines = pdf.splitTextToSize(checklist.parecer_conclusivo, contentWidth);
+        pdf.text(parecerLines, margin, yPos);
+        yPos += 6 * parecerLines.length + 5;
       }
 
-      // Signatures
+      // Next inspection date
+      if (checklist.data_proxima_inspecao) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Próxima Inspeção:", margin, yPos);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(format(new Date(checklist.data_proxima_inspecao), "dd/MM/yyyy"), margin + 40, yPos);
+        yPos += 8;
+      }
+
+      // Inspector name
+      if (checklist.responsavel_inspecao) {
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Responsável pela Inspeção:", margin, yPos);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(checklist.responsavel_inspecao, margin + 60, yPos);
+        yPos += 15;
+      }
+
+      // SIGNATURES - Side by side
       if (checklist.assinatura_rt || checklist.assinatura_cliente) {
         if (yPos > pageHeight - 80) {
           pdf.addPage();
           yPos = margin;
         }
 
+        const signatureWidth = 60;
+        const signatureHeight = 20;
+        const spacing = (contentWidth - (signatureWidth * 3)) / 2;
+        
+        let xPos = margin;
+        
+        // RT Signature
         if (checklist.assinatura_rt) {
-          pdf.setFont("helvetica", "bold");
-          pdf.text("Assinatura do RT:", margin, yPos);
-          yPos += 5;
-          pdf.addImage(checklist.assinatura_rt, "PNG", margin, yPos, 60, 20);
-          yPos += 30;
+          pdf.addImage(checklist.assinatura_rt, "PNG", xPos, yPos, signatureWidth, signatureHeight);
+          pdf.setDrawColor(0, 0, 0);
+          pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
+          pdf.setFontSize(8);
+          pdf.setFont("helvetica", "normal");
+          pdf.text("Responsável Técnico", xPos + signatureWidth / 2, yPos + signatureHeight + 7, { align: "center" });
+          xPos += signatureWidth + spacing;
         }
-
+        
+        // Client Signature
         if (checklist.assinatura_cliente) {
-          pdf.setFont("helvetica", "bold");
-          pdf.text("Assinatura do Representante:", margin, yPos);
-          yPos += 5;
-          pdf.addImage(checklist.assinatura_cliente, "PNG", margin, yPos, 60, 20);
+          pdf.addImage(checklist.assinatura_cliente, "PNG", xPos, yPos, signatureWidth, signatureHeight);
+          pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
+          pdf.text("Dono do Estabelecimento", xPos + signatureWidth / 2, yPos + signatureHeight + 7, { align: "center" });
+          xPos += signatureWidth + spacing;
         }
+        
+        // Witness placeholder (optional - only show if both signatures exist)
+        if (checklist.assinatura_rt && checklist.assinatura_cliente) {
+          pdf.line(xPos, yPos + signatureHeight, xPos + signatureWidth, yPos + signatureHeight);
+          pdf.text("Testemunha", xPos + signatureWidth / 2, yPos + signatureHeight + 5, { align: "center" });
+        }
+        
+        yPos += signatureHeight + 15;
       }
+
+      // FOOTER
+      yPos = pageHeight - 15;
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "italic");
+      pdf.setTextColor(120, 120, 120);
+      const footerText = companyName ? `${companyName} | RT-Checklist` : "RT-Checklist";
+      pdf.text(footerText, pageWidth / 2, yPos, { align: "center" });
+      pdf.setFontSize(7);
+      pdf.text(`Gerado automaticamente em ${format(new Date(), "dd/MM/yyyy")} às ${format(new Date(), "HH:mm")}`, 
+        pageWidth / 2, yPos + 4, { align: "center" });
 
       pdf.save(`Checklist_${checklist.clientes.razao_social}_${format(new Date(checklist.data_aplicacao), "dd-MM-yyyy")}.pdf`);
       toast.success("PDF gerado com sucesso!");

@@ -172,6 +172,13 @@ const Clientes = () => {
       return;
     }
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Usuário não autenticado");
+      setLoading(false);
+      return;
+    }
+
     let atualizados = 0;
     for (const cliente of clientesSemCoordenadas) {
       if (cliente.rua && cliente.cidade && cliente.estado) {
@@ -179,11 +186,15 @@ const Clientes = () => {
         const coords = await geocodeAddress(endereco);
         
         if (coords) {
-          await supabase
+          const { error } = await supabase
             .from("clientes")
             .update({ latitude: coords.lat, longitude: coords.lng })
-            .eq("id", cliente.id);
-          atualizados++;
+            .eq("id", cliente.id)
+            .eq("tenant_id", user.id);
+          
+          if (!error) {
+            atualizados++;
+          }
         }
         
         // Delay para não sobrecarregar a API do Nominatim
