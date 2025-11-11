@@ -46,6 +46,7 @@ const AplicarChecklist = () => {
   const [loading, setLoading] = useState(false);
   const [assinaturaRT, setAssinaturaRT] = useState<string>("");
   const [assinaturaCliente, setAssinaturaCliente] = useState<string>("");
+  const [assinaturaTestemunha, setAssinaturaTestemunha] = useState<string>("");
   const [parecerConclusivo, setParecerConclusivo] = useState<string>("");
   const [dataProximaInspecao, setDataProximaInspecao] = useState<string>("");
   const [nomeRT, setNomeRT] = useState<string>("");
@@ -336,14 +337,14 @@ const AplicarChecklist = () => {
       yPos += 15;
     }
 
-    // SIGNATURES - Side by side
-    if (assinaturaRT || assinaturaCliente) {
+    // SIGNATURES - Side by side in 3 columns
+    if (assinaturaRT || assinaturaCliente || assinaturaTestemunha) {
       if (yPos > pageHeight - 80) {
         pdf.addPage();
         yPos = margin;
       }
 
-      const signatureWidth = 60;
+      const signatureWidth = 50;
       const signatureHeight = 20;
       const spacing = (contentWidth - (signatureWidth * 3)) / 2;
       
@@ -352,27 +353,28 @@ const AplicarChecklist = () => {
       // RT Signature
       if (assinaturaRT) {
         pdf.addImage(assinaturaRT, "PNG", xPos, yPos, signatureWidth, signatureHeight);
-        pdf.setDrawColor(0, 0, 0);
-        pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
-        pdf.setFontSize(8);
-        pdf.setFont("helvetica", "normal");
-        pdf.text("Responsável Técnico", xPos + signatureWidth / 2, yPos + signatureHeight + 7, { align: "center" });
-        xPos += signatureWidth + spacing;
       }
+      pdf.setDrawColor(0, 0, 0);
+      pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Responsável Técnico", xPos + signatureWidth / 2, yPos + signatureHeight + 7, { align: "center" });
+      xPos += signatureWidth + spacing;
       
       // Client Signature
       if (assinaturaCliente) {
         pdf.addImage(assinaturaCliente, "PNG", xPos, yPos, signatureWidth, signatureHeight);
-        pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
-        pdf.text("Dono do Estabelecimento", xPos + signatureWidth / 2, yPos + signatureHeight + 7, { align: "center" });
-        xPos += signatureWidth + spacing;
       }
+      pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
+      pdf.text("Dono do Estabelecimento", xPos + signatureWidth / 2, yPos + signatureHeight + 7, { align: "center" });
+      xPos += signatureWidth + spacing;
       
-      // Witness placeholder (optional - only show if both signatures exist)
-      if (assinaturaRT && assinaturaCliente) {
-        pdf.line(xPos, yPos + signatureHeight, xPos + signatureWidth, yPos + signatureHeight);
-        pdf.text("Testemunha", xPos + signatureWidth / 2, yPos + signatureHeight + 5, { align: "center" });
+      // Witness Signature
+      if (assinaturaTestemunha) {
+        pdf.addImage(assinaturaTestemunha, "PNG", xPos, yPos, signatureWidth, signatureHeight);
       }
+      pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
+      pdf.text("Testemunha", xPos + signatureWidth / 2, yPos + signatureHeight + 7, { align: "center" });
       
       yPos += signatureHeight + 15;
     }
@@ -418,6 +420,7 @@ const AplicarChecklist = () => {
       respostas_json: respostas,
       assinatura_rt: assinaturaRT,
       assinatura_cliente: assinaturaCliente,
+      assinatura_testemunha: assinaturaTestemunha,
       parecer_conclusivo: parecerConclusivo,
       data_proxima_inspecao: dataProximaInspecao || null,
       responsavel_inspecao: nomeRT
@@ -435,6 +438,7 @@ const AplicarChecklist = () => {
       setModeloSelecionado("");
       setAssinaturaRT("");
       setAssinaturaCliente("");
+      setAssinaturaTestemunha("");
       setParecerConclusivo("");
       setDataProximaInspecao("");
     }
@@ -630,9 +634,10 @@ const AplicarChecklist = () => {
                   <Input value={nomeRT} disabled className="mt-1 bg-muted" />
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid md:grid-cols-3 gap-6">
                   <SignatureCanvas label="Assinatura do RT (Obrigatória)" onSave={setAssinaturaRT} signatureData={assinaturaRT} />
-                  <SignatureCanvas label="Assinatura do Representante do Cliente (Obrigatória)" onSave={setAssinaturaCliente} signatureData={assinaturaCliente} />
+                  <SignatureCanvas label="Assinatura do Cliente (Obrigatória)" onSave={setAssinaturaCliente} signatureData={assinaturaCliente} />
+                  <SignatureCanvas label="Assinatura da Testemunha" onSave={setAssinaturaTestemunha} signatureData={assinaturaTestemunha} />
                 </div>
               </CardContent>
             </Card>

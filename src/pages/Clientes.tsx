@@ -111,15 +111,18 @@ const Clientes = () => {
       return;
     }
 
-    let latitude: number | null = null;
-    let longitude: number | null = null;
+    let latitude: number | null = formData.latitude || null;
+    let longitude: number | null = formData.longitude || null;
 
-    if (formData.rua && formData.cidade && formData.estado) {
-      const endereco = `${formData.rua}, ${formData.bairro || ""}, ${formData.cidade}, ${formData.estado}, Brasil`;
-      const coords = await geocodeAddress(endereco);
-      if (coords) {
-        latitude = coords.lat;
-        longitude = coords.lng;
+    // Only geocode if coordinates are not provided manually
+    if (!latitude || !longitude) {
+      if (formData.rua && formData.cidade && formData.estado) {
+        const endereco = `${formData.rua}, ${formData.bairro || ""}, ${formData.cidade}, ${formData.estado}, Brasil`;
+        const coords = await geocodeAddress(endereco);
+        if (coords) {
+          latitude = coords.lat;
+          longitude = coords.lng;
+        }
       }
     }
 
@@ -362,6 +365,35 @@ const Clientes = () => {
                     value={formData.cpf_responsavel || ""}
                     onChange={(e) => setFormData({ ...formData, cpf_responsavel: e.target.value })}
                   />
+                </div>
+
+                <div className="col-span-2">
+                  <Label htmlFor="coordenadas">Coordenadas (Latitude, Longitude)</Label>
+                  <Input
+                    id="coordenadas"
+                    value={
+                      formData.latitude && formData.longitude
+                        ? `${formData.latitude}, ${formData.longitude}`
+                        : ""
+                    }
+                    onChange={(e) => {
+                      const value = e.target.value.trim();
+                      const parts = value.split(",").map((p) => p.trim());
+                      if (parts.length === 2) {
+                        const lat = parseFloat(parts[0]);
+                        const lng = parseFloat(parts[1]);
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                          setFormData({ ...formData, latitude: lat, longitude: lng });
+                        }
+                      } else if (value === "") {
+                        setFormData({ ...formData, latitude: null, longitude: null });
+                      }
+                    }}
+                    placeholder="Ex: -18.9188, -48.2766"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Cole as coordenadas do Google Maps ou deixe vazio para geocodificar automaticamente
+                  </p>
                 </div>
               </div>
 
