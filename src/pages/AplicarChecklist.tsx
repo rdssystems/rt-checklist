@@ -201,39 +201,63 @@ const AplicarChecklist = () => {
     
     yPos += 8;
 
-    // RESPONSES SECTION
-    (modeloAtual.estrutura_json?.campos || []).forEach((campo, index) => {
+    // RESPONSES SECTION - TABLE FORMAT
+    const campos = modeloAtual.estrutura_json?.campos || [];
+
+    // Table header
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFillColor(230, 230, 230);
+    pdf.rect(margin, yPos, contentWidth, 8, "F");
+    pdf.text("ITEM", margin + 2, yPos + 5);
+    pdf.text("PERGUNTA", margin + 15, yPos + 5);
+    pdf.text("RESPOSTA", pageWidth - margin - 50, yPos + 5);
+    yPos += 10;
+
+    let itemNumber = 1;
+    campos.forEach((campo: any) => {
       if (yPos > pageHeight - 40) {
         pdf.addPage();
         yPos = margin;
+        // Repeat table header
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFillColor(230, 230, 230);
+        pdf.rect(margin, yPos, contentWidth, 8, "F");
+        pdf.text("ITEM", margin + 2, yPos + 5);
+        pdf.text("PERGUNTA", margin + 15, yPos + 5);
+        pdf.text("RESPOSTA", pageWidth - margin - 50, yPos + 5);
+        yPos += 10;
       }
 
       if (campo.tipo === "titulo") {
-        pdf.setFontSize(11);
+        // Section headers in table
+        pdf.setFillColor(245, 245, 255);
+        const titleHeight = 8;
+        pdf.rect(margin, yPos, contentWidth, titleHeight, "F");
+        pdf.setFontSize(10);
         pdf.setFont("helvetica", "bold");
-        pdf.setTextColor(60, 60, 200);
-        const tituloLines = pdf.splitTextToSize(campo.label, contentWidth);
-        pdf.text(tituloLines, margin, yPos);
+        pdf.setTextColor(40, 40, 180);
+        pdf.text(campo.label, margin + 2, yPos + 5);
         pdf.setTextColor(0, 0, 0);
-        yPos += 6 * tituloLines.length + 2;
+        yPos += titleHeight + 2;
       } else if (campo.tipo === "descricao") {
-        pdf.setFontSize(9);
+        // Description in table
+        pdf.setFillColor(250, 250, 250);
+        pdf.setFontSize(8);
         pdf.setFont("helvetica", "italic");
         pdf.setTextColor(100, 100, 100);
-        const descLines = pdf.splitTextToSize(campo.label, contentWidth);
-        pdf.text(descLines, margin, yPos);
+        const descLines = pdf.splitTextToSize(campo.label, contentWidth - 4);
+        const descHeight = descLines.length * 4 + 2;
+        pdf.rect(margin, yPos, contentWidth, descHeight, "F");
+        pdf.text(descLines, margin + 2, yPos + 3);
         pdf.setTextColor(0, 0, 0);
-        yPos += 5 * descLines.length + 2;
+        yPos += descHeight + 1;
       } else {
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "bold");
-        const perguntaLines = pdf.splitTextToSize(`${index + 1}. ${campo.label}`, contentWidth);
-        pdf.text(perguntaLines, margin, yPos);
-        yPos += 5 * perguntaLines.length;
-
+        // Question rows in table
         const resposta = respostas[campo.id];
         const outrosText = respostas[`${campo.id}_outros_text`];
-        let respostaText = "Não respondido";
+        let respostaText = "---";
         
         if (Array.isArray(resposta)) {
           respostaText = resposta.join(", ");
@@ -243,16 +267,37 @@ const AplicarChecklist = () => {
         } else if (resposta !== undefined && resposta !== null && resposta !== "") {
           respostaText = String(resposta);
         }
+
+        // Draw table borders
+        pdf.setDrawColor(200, 200, 200);
+        pdf.setLineWidth(0.1);
         
+        // Calculate row height based on content
+        pdf.setFontSize(8);
         pdf.setFont("helvetica", "normal");
-        const respostaLines = pdf.splitTextToSize(`   ${respostaText}`, contentWidth);
-        pdf.text(respostaLines, margin, yPos);
-        yPos += 5 * respostaLines.length + 1;
-        
-        // Light separator
-        pdf.setDrawColor(230, 230, 230);
-        pdf.line(margin, yPos, pageWidth - margin, yPos);
-        yPos += 2;
+        const perguntaLines = pdf.splitTextToSize(campo.label, 95);
+        const respostaLines = pdf.splitTextToSize(respostaText, 48);
+        const rowHeight = Math.max(perguntaLines.length, respostaLines.length) * 4 + 3;
+
+        // Draw cells
+        pdf.rect(margin, yPos, 12, rowHeight); // Item number column
+        pdf.rect(margin + 12, yPos, 95, rowHeight); // Question column
+        pdf.rect(margin + 107, yPos, 63, rowHeight); // Answer column
+
+        // Fill item number
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8);
+        pdf.text(String(itemNumber), margin + 6, yPos + 4, { align: "center" });
+
+        // Fill question
+        pdf.setFont("helvetica", "normal");
+        pdf.text(perguntaLines, margin + 14, yPos + 3);
+
+        // Fill answer
+        pdf.text(respostaLines, margin + 109, yPos + 3);
+
+        yPos += rowHeight;
+        itemNumber++;
       }
     });
 

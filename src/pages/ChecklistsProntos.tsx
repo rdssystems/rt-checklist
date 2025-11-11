@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { FileCheck, Download, Calendar, User, Building2, Trash2, Search } from "lucide-react";
+import { FileCheck, Download, Calendar, User, Building2, Trash2, Search, Eye } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import jsPDF from "jspdf";
@@ -42,6 +43,7 @@ const ChecklistsProntos = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<"all" | "checklist" | "empresa">("all");
+  const [viewingChecklist, setViewingChecklist] = useState<ChecklistPronto | null>(null);
 
   useEffect(() => {
     loadChecklists();
@@ -206,42 +208,64 @@ const ChecklistsProntos = () => {
       
       yPos += 8;
 
-      // RESPONSES SECTION
+      // RESPONSES SECTION - TABLE FORMAT
       const campos = checklist.modelos_checklist.estrutura_json?.campos || [];
       const respostas = checklist.respostas_json || {};
 
-      campos.forEach((campo: any, index: number) => {
+      // Table header
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFillColor(230, 230, 230);
+      pdf.rect(margin, yPos, contentWidth, 8, "F");
+      pdf.text("ITEM", margin + 2, yPos + 5);
+      pdf.text("PERGUNTA", margin + 15, yPos + 5);
+      pdf.text("RESPOSTA", pageWidth - margin - 50, yPos + 5);
+      yPos += 10;
+
+      let itemNumber = 1;
+      campos.forEach((campo: any) => {
         if (yPos > pageHeight - 40) {
           pdf.addPage();
           yPos = margin;
+          // Repeat table header
+          pdf.setFontSize(10);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFillColor(230, 230, 230);
+          pdf.rect(margin, yPos, contentWidth, 8, "F");
+          pdf.text("ITEM", margin + 2, yPos + 5);
+          pdf.text("PERGUNTA", margin + 15, yPos + 5);
+          pdf.text("RESPOSTA", pageWidth - margin - 50, yPos + 5);
+          yPos += 10;
         }
 
         if (campo.tipo === "titulo") {
-          pdf.setFontSize(11);
+          // Section headers in table
+          pdf.setFillColor(245, 245, 255);
+          const titleHeight = 8;
+          pdf.rect(margin, yPos, contentWidth, titleHeight, "F");
+          pdf.setFontSize(10);
           pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(60, 60, 200);
-          const tituloLines = pdf.splitTextToSize(campo.label, contentWidth);
-          pdf.text(tituloLines, margin, yPos);
+          pdf.setTextColor(40, 40, 180);
+          pdf.text(campo.label, margin + 2, yPos + 5);
           pdf.setTextColor(0, 0, 0);
-          yPos += 6 * tituloLines.length + 2;
+          yPos += titleHeight + 2;
         } else if (campo.tipo === "descricao") {
-          pdf.setFontSize(9);
+          // Description in table
+          pdf.setFillColor(250, 250, 250);
+          pdf.setFontSize(8);
           pdf.setFont("helvetica", "italic");
           pdf.setTextColor(100, 100, 100);
-          const descLines = pdf.splitTextToSize(campo.label, contentWidth);
-          pdf.text(descLines, margin, yPos);
+          const descLines = pdf.splitTextToSize(campo.label, contentWidth - 4);
+          const descHeight = descLines.length * 4 + 2;
+          pdf.rect(margin, yPos, contentWidth, descHeight, "F");
+          pdf.text(descLines, margin + 2, yPos + 3);
           pdf.setTextColor(0, 0, 0);
-          yPos += 5 * descLines.length + 2;
+          yPos += descHeight + 1;
         } else {
-          pdf.setFontSize(9);
-          pdf.setFont("helvetica", "bold");
-          const perguntaLines = pdf.splitTextToSize(`${index + 1}. ${campo.label}`, contentWidth);
-          pdf.text(perguntaLines, margin, yPos);
-          yPos += 5 * perguntaLines.length;
-
+          // Question rows in table
           const resposta = respostas[campo.id];
           const outrosText = respostas[`${campo.id}_outros_text`];
-          let respostaText = "Não respondido";
+          let respostaText = "---";
           
           if (Array.isArray(resposta)) {
             respostaText = resposta.join(", ");
@@ -251,16 +275,37 @@ const ChecklistsProntos = () => {
           } else if (resposta !== undefined && resposta !== null && resposta !== "") {
             respostaText = String(resposta);
           }
+
+          // Draw table borders
+          pdf.setDrawColor(200, 200, 200);
+          pdf.setLineWidth(0.1);
           
+          // Calculate row height based on content
+          pdf.setFontSize(8);
           pdf.setFont("helvetica", "normal");
-          const respostaLines = pdf.splitTextToSize(`   ${respostaText}`, contentWidth);
-          pdf.text(respostaLines, margin, yPos);
-          yPos += 5 * respostaLines.length + 1;
-          
-          // Light separator
-          pdf.setDrawColor(230, 230, 230);
-          pdf.line(margin, yPos, pageWidth - margin, yPos);
-          yPos += 2;
+          const perguntaLines = pdf.splitTextToSize(campo.label, 95);
+          const respostaLines = pdf.splitTextToSize(respostaText, 48);
+          const rowHeight = Math.max(perguntaLines.length, respostaLines.length) * 4 + 3;
+
+          // Draw cells
+          pdf.rect(margin, yPos, 12, rowHeight); // Item number column
+          pdf.rect(margin + 12, yPos, 95, rowHeight); // Question column
+          pdf.rect(margin + 107, yPos, 63, rowHeight); // Answer column
+
+          // Fill item number
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(8);
+          pdf.text(String(itemNumber), margin + 6, yPos + 4, { align: "center" });
+
+          // Fill question
+          pdf.setFont("helvetica", "normal");
+          pdf.text(perguntaLines, margin + 14, yPos + 3);
+
+          // Fill answer
+          pdf.text(respostaLines, margin + 109, yPos + 3);
+
+          yPos += rowHeight;
+          itemNumber++;
         }
       });
 
@@ -437,6 +482,10 @@ const ChecklistsProntos = () => {
                   <CardTitle className="flex items-center justify-between">
                     <span>{checklist.modelos_checklist.nome_modelo}</span>
                     <div className="flex gap-2">
+                      <Button onClick={() => setViewingChecklist(checklist)} size="sm" variant="outline">
+                        <Eye className="w-4 h-4 mr-2" />
+                        Visualizar
+                      </Button>
                       <Button onClick={() => generatePDF(checklist)} size="sm" variant="default">
                         <Download className="w-4 h-4 mr-2" />
                         Baixar PDF
@@ -473,6 +522,141 @@ const ChecklistsProntos = () => {
             ))}
           </div>
         )}
+
+        {/* View Dialog */}
+        <Dialog open={viewingChecklist !== null} onOpenChange={() => setViewingChecklist(null)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{viewingChecklist?.modelos_checklist.nome_modelo}</DialogTitle>
+            </DialogHeader>
+            {viewingChecklist && (
+              <div className="space-y-4">
+                {/* Client Info */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Informações do Cliente</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div><strong>Razão Social:</strong> {viewingChecklist.clientes.razao_social}</div>
+                    <div><strong>CNPJ:</strong> {viewingChecklist.clientes.cnpj}</div>
+                    <div><strong>Endereço:</strong> {viewingChecklist.clientes.rua}, {viewingChecklist.clientes.bairro}, {viewingChecklist.clientes.cidade}, {viewingChecklist.clientes.estado}</div>
+                    {viewingChecklist.clientes.responsavel_legal && (
+                      <div><strong>Responsável Legal:</strong> {viewingChecklist.clientes.responsavel_legal}</div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Responses Table */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Respostas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted">
+                          <tr>
+                            <th className="p-2 text-left font-semibold w-12">Item</th>
+                            <th className="p-2 text-left font-semibold">Pergunta</th>
+                            <th className="p-2 text-left font-semibold w-1/3">Resposta</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {viewingChecklist.modelos_checklist.estrutura_json?.campos.map((campo: any, index: number) => {
+                            if (campo.tipo === "titulo") {
+                              return (
+                                <tr key={campo.id} className="bg-accent/50">
+                                  <td colSpan={3} className="p-2 font-bold text-primary">
+                                    {campo.label}
+                                  </td>
+                                </tr>
+                              );
+                            }
+                            if (campo.tipo === "descricao") {
+                              return (
+                                <tr key={campo.id} className="bg-muted/30">
+                                  <td colSpan={3} className="p-2 text-xs italic text-muted-foreground">
+                                    {campo.label}
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            const resposta = viewingChecklist.respostas_json?.[campo.id];
+                            const outrosText = viewingChecklist.respostas_json?.[`${campo.id}_outros_text`];
+                            let respostaText = "---";
+                            
+                            if (Array.isArray(resposta)) {
+                              respostaText = resposta.join(", ");
+                              if (outrosText) {
+                                respostaText += ` (${outrosText})`;
+                              }
+                            } else if (resposta !== undefined && resposta !== null && resposta !== "") {
+                              respostaText = String(resposta);
+                            }
+
+                            return (
+                              <tr key={campo.id} className="border-t">
+                                <td className="p-2 text-center font-semibold">{index + 1}</td>
+                                <td className="p-2">{campo.label}</td>
+                                <td className="p-2">{respostaText}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Additional Info */}
+                {(viewingChecklist.parecer_conclusivo || viewingChecklist.data_proxima_inspecao || viewingChecklist.responsavel_inspecao) && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Informações Adicionais</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      {viewingChecklist.parecer_conclusivo && (
+                        <div><strong>Parecer Conclusivo:</strong> {viewingChecklist.parecer_conclusivo}</div>
+                      )}
+                      {viewingChecklist.data_proxima_inspecao && (
+                        <div><strong>Próxima Inspeção:</strong> {format(new Date(viewingChecklist.data_proxima_inspecao), "dd/MM/yyyy")}</div>
+                      )}
+                      {viewingChecklist.responsavel_inspecao && (
+                        <div><strong>Responsável:</strong> {viewingChecklist.responsavel_inspecao}</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Signatures */}
+                {(viewingChecklist.assinatura_rt || viewingChecklist.assinatura_cliente) && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Assinaturas</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4">
+                        {viewingChecklist.assinatura_rt && (
+                          <div className="text-center">
+                            <img src={viewingChecklist.assinatura_rt} alt="Assinatura RT" className="border rounded p-2 w-full h-24 object-contain" />
+                            <p className="text-sm mt-2">Responsável Técnico</p>
+                          </div>
+                        )}
+                        {viewingChecklist.assinatura_cliente && (
+                          <div className="text-center">
+                            <img src={viewingChecklist.assinatura_cliente} alt="Assinatura Cliente" className="border rounded p-2 w-full h-24 object-contain" />
+                            <p className="text-sm mt-2">Dono do Estabelecimento</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
