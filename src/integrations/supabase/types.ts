@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           assinatura_cliente: string | null
           assinatura_rt: string | null
+          assinatura_testemunha: string | null
           cliente_id: string
           created_at: string | null
           data_aplicacao: string | null
@@ -32,6 +33,7 @@ export type Database = {
         Insert: {
           assinatura_cliente?: string | null
           assinatura_rt?: string | null
+          assinatura_testemunha?: string | null
           cliente_id: string
           created_at?: string | null
           data_aplicacao?: string | null
@@ -46,6 +48,7 @@ export type Database = {
         Update: {
           assinatura_cliente?: string | null
           assinatura_rt?: string | null
+          assinatura_testemunha?: string | null
           cliente_id?: string
           created_at?: string | null
           data_aplicacao?: string | null
