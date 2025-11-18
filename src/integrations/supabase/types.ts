@@ -14,7 +14,206 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      aplicacoes_checklist: {
+        Row: {
+          assinatura_cliente: string | null
+          assinatura_rt: string | null
+          assinatura_testemunha: string | null
+          cliente_id: string
+          created_at: string | null
+          data_aplicacao: string | null
+          data_proxima_inspecao: string | null
+          id: string
+          modelo_id: string
+          parecer_conclusivo: string | null
+          responsavel_inspecao: string | null
+          respostas_json: Json
+          tenant_id: string
+        }
+        Insert: {
+          assinatura_cliente?: string | null
+          assinatura_rt?: string | null
+          assinatura_testemunha?: string | null
+          cliente_id: string
+          created_at?: string | null
+          data_aplicacao?: string | null
+          data_proxima_inspecao?: string | null
+          id?: string
+          modelo_id: string
+          parecer_conclusivo?: string | null
+          responsavel_inspecao?: string | null
+          respostas_json?: Json
+          tenant_id: string
+        }
+        Update: {
+          assinatura_cliente?: string | null
+          assinatura_rt?: string | null
+          assinatura_testemunha?: string | null
+          cliente_id?: string
+          created_at?: string | null
+          data_aplicacao?: string | null
+          data_proxima_inspecao?: string | null
+          id?: string
+          modelo_id?: string
+          parecer_conclusivo?: string | null
+          responsavel_inspecao?: string | null
+          respostas_json?: Json
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aplicacoes_checklist_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aplicacoes_checklist_modelo_id_fkey"
+            columns: ["modelo_id"]
+            isOneToOne: false
+            referencedRelation: "modelos_checklist"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aplicacoes_checklist_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clientes: {
+        Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          cnpj: string
+          cpf_responsavel: string | null
+          data_cadastro: string | null
+          email_cliente: string | null
+          estado: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          nome_fantasia: string | null
+          razao_social: string
+          responsavel_legal: string | null
+          rua: string | null
+          telefone: string | null
+          tenant_id: string
+        }
+        Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj: string
+          cpf_responsavel?: string | null
+          data_cadastro?: string | null
+          email_cliente?: string | null
+          estado?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          nome_fantasia?: string | null
+          razao_social: string
+          responsavel_legal?: string | null
+          rua?: string | null
+          telefone?: string | null
+          tenant_id: string
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string
+          cpf_responsavel?: string | null
+          data_cadastro?: string | null
+          email_cliente?: string | null
+          estado?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          nome_fantasia?: string | null
+          razao_social?: string
+          responsavel_legal?: string | null
+          rua?: string | null
+          telefone?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      modelos_checklist: {
+        Row: {
+          created_at: string | null
+          estrutura_json: Json
+          id: string
+          nome_modelo: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          estrutura_json?: Json
+          id?: string
+          nome_modelo: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          estrutura_json?: Json
+          id?: string
+          nome_modelo?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modelos_checklist_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          company_name: string | null
+          created_at: string | null
+          email: string
+          id: string
+          logo_url: string | null
+          nome_rt: string
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string | null
+          email: string
+          id: string
+          logo_url?: string | null
+          nome_rt: string
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          logo_url?: string | null
+          nome_rt?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
