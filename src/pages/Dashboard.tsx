@@ -58,51 +58,99 @@ const Dashboard = () => {
 
   return (
     <Layout>
-      <div className="p-6 md:p-8 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">Visão geral do sistema de gestão</p>
+      <div className="p-6 md:p-8 space-y-8 fade-in">
+        {/* Header */}
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground text-lg">Visão geral do sistema de gestão</p>
         </div>
 
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {statCards.map((stat) => (
-            <Card key={stat.title} className="shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
+          {statCards.map((stat, index) => (
+            <Card 
+              key={stat.title} 
+              className="overflow-hidden border-0 shadow-lg hover-lift"
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              <div className={`h-1 ${stat.gradient}`} />
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   {stat.title}
                 </CardTitle>
-                <div className={`${stat.gradient} p-2 rounded-lg`}>
-                  <stat.icon className="w-4 h-4 text-white" />
+                <div className={`${stat.gradient} p-3 rounded-xl shadow-md`}>
+                  <stat.icon className="w-5 h-5 text-white" />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-foreground">{stat.value}</div>
-                <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+              <CardContent className="space-y-1">
+                <div className="text-4xl font-bold tracking-tight">{stat.value}</div>
+                <p className="text-sm text-muted-foreground">{stat.description}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-primary" />
+        {/* Welcome Card */}
+        <Card className="border-0 shadow-lg overflow-hidden">
+          <div className="bg-gradient-primary h-2" />
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-3 text-2xl">
+              <div className="p-2 bg-primary-light rounded-xl">
+                <TrendingUp className="w-6 h-6 text-primary" />
+              </div>
               Bem-vindo ao Sistema
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-base mt-2">
               Gerencie seus clientes e checklists de forma eficiente
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="p-4 bg-muted rounded-lg">
-                <h3 className="font-semibold mb-2">Primeiros Passos</h3>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>• Cadastre seus clientes na seção "Clientes"</li>
-                  <li>• Crie modelos de checklist personalizados</li>
-                  <li>• Aplique checklists durante inspeções</li>
-                  <li>• Acompanhe o histórico de aplicações</li>
-                </ul>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="p-5 bg-gradient-subtle rounded-xl border border-border/50">
+                  <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-primary rounded-full" />
+                    Primeiros Passos
+                  </h3>
+                  <ul className="space-y-3 text-sm">
+                    <li className="flex items-start gap-3">
+                      <div className="mt-0.5 w-5 h-5 rounded-full bg-primary-light flex items-center justify-center flex-shrink-0">
+                        <div className="w-2 h-2 bg-primary rounded-full" />
+                      </div>
+                      <span className="text-muted-foreground">Cadastre seus clientes na seção "Clientes"</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="mt-0.5 w-5 h-5 rounded-full bg-primary-light flex items-center justify-center flex-shrink-0">
+                        <div className="w-2 h-2 bg-primary rounded-full" />
+                      </div>
+                      <span className="text-muted-foreground">Crie modelos de checklist personalizados</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="mt-0.5 w-5 h-5 rounded-full bg-primary-light flex items-center justify-center flex-shrink-0">
+                        <div className="w-2 h-2 bg-primary rounded-full" />
+                      </div>
+                      <span className="text-muted-foreground">Aplique checklists durante inspeções</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="mt-0.5 w-5 h-5 rounded-full bg-primary-light flex items-center justify-center flex-shrink-0">
+                        <div className="w-2 h-2 bg-primary rounded-full" />
+                      </div>
+                      <span className="text-muted-foreground">Acompanhe o histórico de aplicações</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="p-5 bg-accent-light/30 rounded-xl border border-accent/20">
+                  <h3 className="font-semibold text-lg mb-2 flex items-center gap-2 text-accent-foreground">
+                    <div className="w-2 h-2 bg-accent rounded-full" />
+                    Dica Rápida
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Use o mapa de clientes para visualizar geograficamente suas vistorias e planejar suas rotas de inspeção.
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>

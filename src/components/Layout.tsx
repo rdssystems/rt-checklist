@@ -86,27 +86,32 @@ const Layout = ({ children }: LayoutProps) => {
 
   const NavContent = () => (
     <>
-      {navItems.map((item) => (
-        <Button
-          key={item.path}
-          variant="ghost"
-          className={cn(
-            "w-full justify-start gap-3 hover:bg-accent",
-            window.location.pathname === item.path && "bg-primary/10 text-primary"
-          )}
-          onClick={() => {
-            navigate(item.path);
-            setMobileMenuOpen(false);
-          }}
-        >
-          <item.icon className="w-5 h-5" />
-          {item.label}
-        </Button>
-      ))}
+      {navItems.map((item) => {
+        const isActive = window.location.pathname === item.path;
+        return (
+          <Button
+            key={item.path}
+            variant="ghost"
+            className={cn(
+              "w-full justify-start gap-3 h-12 rounded-xl font-medium transition-all duration-200",
+              isActive 
+                ? "bg-primary text-primary-foreground shadow-md hover:bg-primary-hover" 
+                : "hover:bg-accent/50"
+            )}
+            onClick={() => {
+              navigate(item.path);
+              setMobileMenuOpen(false);
+            }}
+          >
+            <item.icon className="w-5 h-5" />
+            {item.label}
+          </Button>
+        );
+      })}
       <div className="flex-1" />
       <Button
         variant="ghost"
-        className="w-full justify-start gap-3 text-destructive hover:bg-destructive/10 hover:text-destructive"
+        className="w-full justify-start gap-3 h-12 rounded-xl font-medium text-destructive hover:bg-destructive-light hover:text-destructive transition-all duration-200"
         onClick={handleSignOut}
       >
         <LogOut className="w-5 h-5" />
