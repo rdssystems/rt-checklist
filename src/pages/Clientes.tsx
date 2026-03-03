@@ -168,7 +168,7 @@ const Clientes = () => {
   const handleGeocodeAll = async () => {
     setLoading(true);
     const clientesSemCoordenadas = clientes.filter(c => !c.latitude || !c.longitude);
-    
+
     if (clientesSemCoordenadas.length === 0) {
       toast.info("Todos os clientes já possuem coordenadas!");
       setLoading(false);
@@ -187,24 +187,24 @@ const Clientes = () => {
       if (cliente.rua && cliente.cidade && cliente.estado) {
         const endereco = `${cliente.rua}, ${cliente.bairro || ""}, ${cliente.cidade}, ${cliente.estado}, Brasil`;
         const coords = await geocodeAddress(endereco);
-        
+
         if (coords) {
           const { error } = await supabase
             .from("clientes")
             .update({ latitude: coords.lat, longitude: coords.lng })
             .eq("id", cliente.id)
             .eq("tenant_id", user.id);
-          
+
           if (!error) {
             atualizados++;
           }
         }
-        
+
         // Delay para não sobrecarregar a API do Nominatim
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
-    
+
     toast.success(`${atualizados} de ${clientesSemCoordenadas.length} clientes geocodificados!`);
     setLoading(false);
     fetchClientes();
@@ -224,189 +224,192 @@ const Clientes = () => {
   return (
     <Layout>
       <div className="p-6 md:p-8 space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Clientes</h1>
-            <p className="text-muted-foreground">Gerencie as empresas cadastradas</p>
+            <h1 className="text-3xl font-bold text-foreground mb-1">Clientes</h1>
+            <p className="text-muted-foreground text-sm">Gerencie as empresas cadastradas</p>
           </div>
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleGeocodeAll} 
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleGeocodeAll}
               disabled={loading}
               variant="outline"
+              className="flex-1 sm:flex-none"
             >
-              <MapPin className="w-4 h-4 mr-2" />
-              {loading ? "Atualizando..." : "Atualizar Coordenadas"}
+              <MapPin className="w-4 h-4 mr-2 sm:hidden" />
+              <MapPin className="w-4 h-4 mr-2 hidden sm:block" />
+              <span className="sm:hidden">Coordenadas</span>
+              <span className="hidden sm:inline">{loading ? "Atualizando..." : "Atualizar Coordenadas"}</span>
             </Button>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => openDialog()} className="bg-gradient-primary">
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Cliente
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingId ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
-                <DialogDescription>Preencha os dados da empresa</DialogDescription>
-              </DialogHeader>
+              <DialogTrigger asChild>
+                <Button onClick={() => openDialog()} className="bg-primary hover:bg-primary/90 text-white flex-1 sm:flex-none">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Novo Cliente
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingId ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
+                  <DialogDescription>Preencha os dados da empresa</DialogDescription>
+                </DialogHeader>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Label htmlFor="razao_social">Razão Social *</Label>
-                  <Input
-                    id="razao_social"
-                    value={formData.razao_social || ""}
-                    onChange={(e) => setFormData({ ...formData, razao_social: e.target.value })}
-                  />
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <Label htmlFor="razao_social">Razão Social *</Label>
+                    <Input
+                      id="razao_social"
+                      value={formData.razao_social || ""}
+                      onChange={(e) => setFormData({ ...formData, razao_social: e.target.value })}
+                    />
+                  </div>
 
-                <div>
-                  <Label htmlFor="nome_fantasia">Nome Fantasia</Label>
-                  <Input
-                    id="nome_fantasia"
-                    value={formData.nome_fantasia || ""}
-                    onChange={(e) => setFormData({ ...formData, nome_fantasia: e.target.value })}
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="nome_fantasia">Nome Fantasia</Label>
+                    <Input
+                      id="nome_fantasia"
+                      value={formData.nome_fantasia || ""}
+                      onChange={(e) => setFormData({ ...formData, nome_fantasia: e.target.value })}
+                    />
+                  </div>
 
-                <div>
-                  <Label htmlFor="cnpj">CNPJ *</Label>
-                  <Input
-                    id="cnpj"
-                    value={formData.cnpj || ""}
-                    onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="cnpj">CNPJ *</Label>
+                    <Input
+                      id="cnpj"
+                      value={formData.cnpj || ""}
+                      onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
+                    />
+                  </div>
 
-                <div>
-                  <Label htmlFor="cep">CEP</Label>
-                  <Input
-                    id="cep"
-                    value={formData.cep || ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setFormData({ ...formData, cep: value });
-                      if (value.replace(/\D/g, "").length === 8) {
-                        fetchCEP(value);
-                      }
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="rua">Rua/Avenida</Label>
-                  <Input
-                    id="rua"
-                    value={formData.rua || ""}
-                    onChange={(e) => setFormData({ ...formData, rua: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="bairro">Bairro</Label>
-                  <Input
-                    id="bairro"
-                    value={formData.bairro || ""}
-                    onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="cidade">Cidade</Label>
-                  <Input
-                    id="cidade"
-                    value={formData.cidade || ""}
-                    onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="estado">Estado</Label>
-                  <Input
-                    id="estado"
-                    value={formData.estado || ""}
-                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="telefone">Telefone</Label>
-                  <Input
-                    id="telefone"
-                    value={formData.telefone || ""}
-                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="email_cliente">Email</Label>
-                  <Input
-                    id="email_cliente"
-                    type="email"
-                    value={formData.email_cliente || ""}
-                    onChange={(e) => setFormData({ ...formData, email_cliente: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="responsavel_legal">Responsável Legal</Label>
-                  <Input
-                    id="responsavel_legal"
-                    value={formData.responsavel_legal || ""}
-                    onChange={(e) => setFormData({ ...formData, responsavel_legal: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="cpf_responsavel">CPF Responsável</Label>
-                  <Input
-                    id="cpf_responsavel"
-                    value={formData.cpf_responsavel || ""}
-                    onChange={(e) => setFormData({ ...formData, cpf_responsavel: e.target.value })}
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <Label htmlFor="coordenadas">Coordenadas (Latitude, Longitude)</Label>
-                  <Input
-                    id="coordenadas"
-                    value={
-                      formData.latitude && formData.longitude
-                        ? `${formData.latitude}, ${formData.longitude}`
-                        : ""
-                    }
-                    onChange={(e) => {
-                      const value = e.target.value.trim();
-                      const parts = value.split(",").map((p) => p.trim());
-                      if (parts.length === 2) {
-                        const lat = parseFloat(parts[0]);
-                        const lng = parseFloat(parts[1]);
-                        if (!isNaN(lat) && !isNaN(lng)) {
-                          setFormData({ ...formData, latitude: lat, longitude: lng });
+                  <div>
+                    <Label htmlFor="cep">CEP</Label>
+                    <Input
+                      id="cep"
+                      value={formData.cep || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setFormData({ ...formData, cep: value });
+                        if (value.replace(/\D/g, "").length === 8) {
+                          fetchCEP(value);
                         }
-                      } else if (value === "") {
-                        setFormData({ ...formData, latitude: null, longitude: null });
-                      }
-                    }}
-                    placeholder="Ex: -18.9188, -48.2766"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Cole as coordenadas do Google Maps ou deixe vazio para geocodificar automaticamente
-                  </p>
-                </div>
-              </div>
+                      }}
+                    />
+                  </div>
 
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSave} disabled={loading} className="bg-gradient-primary">
-                  {loading ? "Salvando..." : "Salvar"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                  <div>
+                    <Label htmlFor="rua">Rua/Avenida</Label>
+                    <Input
+                      id="rua"
+                      value={formData.rua || ""}
+                      onChange={(e) => setFormData({ ...formData, rua: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="bairro">Bairro</Label>
+                    <Input
+                      id="bairro"
+                      value={formData.bairro || ""}
+                      onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="cidade">Cidade</Label>
+                    <Input
+                      id="cidade"
+                      value={formData.cidade || ""}
+                      onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="estado">Estado</Label>
+                    <Input
+                      id="estado"
+                      value={formData.estado || ""}
+                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="telefone">Telefone</Label>
+                    <Input
+                      id="telefone"
+                      value={formData.telefone || ""}
+                      onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="email_cliente">Email</Label>
+                    <Input
+                      id="email_cliente"
+                      type="email"
+                      value={formData.email_cliente || ""}
+                      onChange={(e) => setFormData({ ...formData, email_cliente: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="responsavel_legal">Responsável Legal</Label>
+                    <Input
+                      id="responsavel_legal"
+                      value={formData.responsavel_legal || ""}
+                      onChange={(e) => setFormData({ ...formData, responsavel_legal: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="cpf_responsavel">CPF Responsável</Label>
+                    <Input
+                      id="cpf_responsavel"
+                      value={formData.cpf_responsavel || ""}
+                      onChange={(e) => setFormData({ ...formData, cpf_responsavel: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <Label htmlFor="coordenadas">Coordenadas (Latitude, Longitude)</Label>
+                    <Input
+                      id="coordenadas"
+                      value={
+                        formData.latitude && formData.longitude
+                          ? `${formData.latitude}, ${formData.longitude}`
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const value = e.target.value.trim();
+                        const parts = value.split(",").map((p) => p.trim());
+                        if (parts.length === 2) {
+                          const lat = parseFloat(parts[0]);
+                          const lng = parseFloat(parts[1]);
+                          if (!isNaN(lat) && !isNaN(lng)) {
+                            setFormData({ ...formData, latitude: lat, longitude: lng });
+                          }
+                        } else if (value === "") {
+                          setFormData({ ...formData, latitude: null, longitude: null });
+                        }
+                      }}
+                      placeholder="Ex: -18.9188, -48.2766"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Cole as coordenadas do Google Maps ou deixe vazio para geocodificar automaticamente
+                    </p>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSave} disabled={loading} className="bg-primary hover:bg-primary/90 text-white">
+                    {loading ? "Salvando..." : "Salvar"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -425,8 +428,6 @@ const Clientes = () => {
                   <TableRow>
                     <TableHead>Razão Social</TableHead>
                     <TableHead>CNPJ</TableHead>
-                    <TableHead>Cidade</TableHead>
-                    <TableHead>Telefone</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -435,8 +436,6 @@ const Clientes = () => {
                     <TableRow key={cliente.id}>
                       <TableCell className="font-medium">{cliente.razao_social}</TableCell>
                       <TableCell>{cliente.cnpj}</TableCell>
-                      <TableCell>{cliente.cidade || "-"}</TableCell>
-                      <TableCell>{cliente.telefone || "-"}</TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button
                           variant="ghost"
@@ -458,7 +457,7 @@ const Clientes = () => {
                   ))}
                   {clientes.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                         Nenhum cliente cadastrado. Clique em "Novo Cliente" para começar.
                       </TableCell>
                     </TableRow>

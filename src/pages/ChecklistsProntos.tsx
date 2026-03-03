@@ -22,6 +22,9 @@ interface ChecklistPronto {
   responsavel_inspecao: string | null;
   assinatura_rt: string | null;
   assinatura_cliente: string | null;
+  assinatura_testemunha?: string | null;
+  nome_cliente_assinatura: string | null;
+  nome_testemunha_assinatura: string | null;
   modelos_checklist: {
     nome_modelo: string;
     estrutura_json: any;
@@ -44,6 +47,8 @@ const ChecklistsProntos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<"all" | "checklist" | "empresa">("all");
   const [viewingChecklist, setViewingChecklist] = useState<ChecklistPronto | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string>("");
+  const [companyName, setCompanyName] = useState<string>("");
 
   useEffect(() => {
     loadChecklists();
@@ -67,8 +72,21 @@ const ChecklistsProntos = () => {
       toast.error("Erro ao carregar checklists");
       console.error(error);
     } else {
-      setChecklists(data || []);
+      setChecklists((data as any) || []);
     }
+
+    // Also fetch logo
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("logo_url, company_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile) {
+      setLogoUrl(profile.logo_url || "");
+      setCompanyName(profile.company_name || "");
+    }
+
     setLoading(false);
   };
 
@@ -90,9 +108,9 @@ const ChecklistsProntos = () => {
 
   const filteredChecklists = checklists.filter((checklist) => {
     if (!searchTerm) return true;
-    
+
     const searchLower = searchTerm.toLowerCase();
-    
+
     if (filterType === "checklist") {
       return checklist.modelos_checklist.nome_modelo.toLowerCase().includes(searchLower);
     } else if (filterType === "empresa") {
@@ -111,37 +129,60 @@ const ChecklistsProntos = () => {
       const { data: { user } } = await supabase.auth.getUser();
       let logoUrl = "";
       let companyName = "";
-      
+
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("logo_url, company_name")
           .eq("id", user.id)
           .single();
-        
+
         if (profile) {
           logoUrl = profile.logo_url || "";
           companyName = profile.company_name || "";
         }
       }
-      
+
       const pdf = new jsPDF();
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 20;
+      const margin = 15; // Reduced margin from 20 to 15 for better space usage
       const contentWidth = pageWidth - 2 * margin;
       let yPos = margin;
+
+      let logoWidth = 30;
+      let logoHeight = 15;
+      if (logoUrl) {
+        try {
+          const img = new window.Image();
+          img.crossOrigin = "Anonymous";
+          img.src = logoUrl;
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+          const ratio = img.width / img.height;
+          logoHeight = 15;
+          logoWidth = 15 * ratio;
+          if (logoWidth > 40) {
+            logoWidth = 40;
+            logoHeight = 40 / ratio;
+          }
+        } catch (e) {
+          console.error("Error loading logo dimensions:", e);
+        }
+      }
 
       // HEADER
       // Add logo if available
       if (logoUrl) {
         try {
-          pdf.addImage(logoUrl, "PNG", margin, yPos, 30, 15);
+          pdf.addImage(logoUrl, "PNG", margin, yPos, logoWidth, logoHeight);
         } catch (e) {
           console.error("Error adding logo:", e);
         }
       }
-      
+
       // Company name and date on the right
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
@@ -149,13 +190,13 @@ const ChecklistsProntos = () => {
         pdf.text(companyName, pageWidth - margin, yPos, { align: "right" });
       }
       pdf.text(format(new Date(checklist.data_aplicacao), "dd/MM/yyyy"), pageWidth - margin, yPos + 5, { align: "right" });
-      
-      yPos += 20;
+
+      yPos += 12; // Reduced gap from 20 to 12
 
       // Title - centered and bold
       pdf.setFontSize(20);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Relatório de Inspeção Sanitária", pageWidth / 2, yPos, { align: "center" });
+      pdf.text("Relatório de Inspeção", pageWidth / 2, yPos, { align: "center" });
       yPos += 8;
 
       // Subtitle - category/checklist name
@@ -175,7 +216,7 @@ const ChecklistsProntos = () => {
       pdf.setFillColor(245, 245, 245);
       const boxHeight = checklist.clientes.responsavel_legal ? 28 : 22;
       pdf.rect(margin, yPos, contentWidth, boxHeight, "F");
-      
+
       yPos += 6;
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
@@ -205,68 +246,91 @@ const ChecklistsProntos = () => {
         pdf.text(checklist.clientes.responsavel_legal, margin + 48, yPos);
         yPos += 5;
       }
-      
+
       yPos += 8;
 
       // RESPONSES SECTION - TABLE FORMAT
-      const campos = checklist.modelos_checklist.estrutura_json?.campos || [];
+      const secoes = checklist.modelos_checklist.estrutura_json?.secoes ||
+        (checklist.modelos_checklist.estrutura_json?.campos ? [{ id: 'default', titulo: '', campos: checklist.modelos_checklist.estrutura_json.campos }] : []);
+
+      const campos = secoes.flatMap((secao: any) => {
+        const result = [];
+        if (secao.titulo) {
+          result.push({ tipo: "titulo", label: secao.titulo, id: `sec-${secao.id}` });
+        }
+        return result.concat(secao.campos || []);
+      });
       const respostas = checklist.respostas_json || {};
 
-      // Table header
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFillColor(230, 230, 230);
-      pdf.rect(margin, yPos, contentWidth, 8, "F");
-      pdf.text("ITEM", margin + 2, yPos + 5);
-      pdf.text("PERGUNTA", margin + 15, yPos + 5);
-      pdf.text("RESPOSTA", pageWidth - margin - 50, yPos + 5);
-      yPos += 10;
-
       let itemNumber = 1;
+      let headerDrawnForSection = false;
+
       campos.forEach((campo: any) => {
-        if (yPos > pageHeight - 40) {
+        if (yPos > pageHeight - 50) {
           pdf.addPage();
           yPos = margin;
-          // Repeat table header
-          pdf.setFontSize(10);
-          pdf.setFont("helvetica", "bold");
-          pdf.setFillColor(230, 230, 230);
-          pdf.rect(margin, yPos, contentWidth, 8, "F");
-          pdf.text("ITEM", margin + 2, yPos + 5);
-          pdf.text("PERGUNTA", margin + 15, yPos + 5);
-          pdf.text("RESPOSTA", pageWidth - margin - 50, yPos + 5);
-          yPos += 10;
+          headerDrawnForSection = false;
         }
 
         if (campo.tipo === "titulo") {
-          // Section headers in table
+          // Draw Section Title first
           pdf.setFillColor(245, 245, 255);
+          pdf.setDrawColor(200, 200, 200);
+          pdf.setLineWidth(0.1);
           const titleHeight = 8;
-          pdf.rect(margin, yPos, contentWidth, titleHeight, "F");
+          pdf.rect(margin, yPos, contentWidth, titleHeight, "FD");
           pdf.setFontSize(10);
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor(40, 40, 180);
           pdf.text(campo.label, margin + 2, yPos + 5);
           pdf.setTextColor(0, 0, 0);
-          yPos += titleHeight + 2;
+          yPos += titleHeight;
+
+          // Immediately draw table header for this section
+          pdf.setFontSize(10);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFillColor(230, 230, 230);
+          pdf.rect(margin, yPos, contentWidth, 8, "FD");
+          pdf.text("ITEM", margin + 2, yPos + 5);
+          pdf.text("PERGUNTA", margin + 14, yPos + 5);
+          pdf.text("RESPOSTA", margin + 114, yPos + 5);
+          yPos += 8;
+          headerDrawnForSection = true;
         } else if (campo.tipo === "descricao") {
           // Description in table
           pdf.setFillColor(250, 250, 250);
+          pdf.setDrawColor(200, 200, 200);
+          pdf.setLineWidth(0.1);
           pdf.setFontSize(8);
           pdf.setFont("helvetica", "italic");
           pdf.setTextColor(100, 100, 100);
           const descLines = pdf.splitTextToSize(campo.label, contentWidth - 4);
           const descHeight = descLines.length * 4 + 2;
-          pdf.rect(margin, yPos, contentWidth, descHeight, "F");
+          pdf.rect(margin, yPos, contentWidth, descHeight, "FD");
           pdf.text(descLines, margin + 2, yPos + 3);
           pdf.setTextColor(0, 0, 0);
-          yPos += descHeight + 1;
+          yPos += descHeight;
         } else {
+          // If it's a question but header wasn't drawn (fallback)
+          if (!headerDrawnForSection) {
+            pdf.setFontSize(10);
+            pdf.setFont("helvetica", "bold");
+            pdf.setFillColor(230, 230, 230);
+            pdf.setDrawColor(200, 200, 200);
+            pdf.setLineWidth(0.1);
+            pdf.rect(margin, yPos, contentWidth, 8, "FD");
+            pdf.text("ITEM", margin + 2, yPos + 5);
+            pdf.text("PERGUNTA", margin + 14, yPos + 5);
+            pdf.text("RESPOSTA", margin + 114, yPos + 5);
+            yPos += 8;
+            headerDrawnForSection = true;
+          }
+
           // Question rows in table
           const resposta = respostas[campo.id];
           const outrosText = respostas[`${campo.id}_outros_text`];
           let respostaText = "---";
-          
+
           if (Array.isArray(resposta)) {
             respostaText = resposta.join(", ");
             if (outrosText) {
@@ -279,18 +343,22 @@ const ChecklistsProntos = () => {
           // Draw table borders
           pdf.setDrawColor(200, 200, 200);
           pdf.setLineWidth(0.1);
-          
+
           // Calculate row height based on content
           pdf.setFontSize(8);
           pdf.setFont("helvetica", "normal");
-          const perguntaLines = pdf.splitTextToSize(campo.label, 95);
-          const respostaLines = pdf.splitTextToSize(respostaText, 48);
+          const perguntaLines = pdf.splitTextToSize(campo.label, 96);
+          const respostaLines = pdf.splitTextToSize(respostaText, contentWidth - 116);
           const rowHeight = Math.max(perguntaLines.length, respostaLines.length) * 4 + 3;
 
           // Draw cells
-          pdf.rect(margin, yPos, 12, rowHeight); // Item number column
-          pdf.rect(margin + 12, yPos, 95, rowHeight); // Question column
-          pdf.rect(margin + 107, yPos, 63, rowHeight); // Answer column
+          const col1W = 12;
+          const col2W = 100;
+          const col3W = contentWidth - 112;
+
+          pdf.rect(margin, yPos, col1W, rowHeight); // Item number column
+          pdf.rect(margin + col1W, yPos, col2W, rowHeight); // Question column
+          pdf.rect(margin + col1W + col2W, yPos, col3W, rowHeight); // Answer column
 
           // Fill item number
           pdf.setFont("helvetica", "bold");
@@ -302,7 +370,7 @@ const ChecklistsProntos = () => {
           pdf.text(perguntaLines, margin + 14, yPos + 3);
 
           // Fill answer
-          pdf.text(respostaLines, margin + 109, yPos + 3);
+          pdf.text(respostaLines, margin + 114, yPos + 3);
 
           yPos += rowHeight;
           itemNumber++;
@@ -323,7 +391,7 @@ const ChecklistsProntos = () => {
         pdf.setFont("helvetica", "normal");
         const parecerLines = pdf.splitTextToSize(checklist.parecer_conclusivo, contentWidth);
         pdf.text(parecerLines, margin, yPos);
-        yPos += 6 * parecerLines.length + 5;
+        yPos += (4 * parecerLines.length) + 8; // Deixa o exato espaço de 2 linhas pro próximo bloco
       }
 
       // Next inspection date
@@ -344,57 +412,99 @@ const ChecklistsProntos = () => {
         yPos += 15;
       }
 
-      // SIGNATURES - Side by side
-      if (checklist.assinatura_rt || checklist.assinatura_cliente) {
+      // SIGNATURES - Side by side perfectly spaced at the absolute bottom
+      if (checklist.assinatura_rt || checklist.assinatura_cliente || checklist.assinatura_testemunha) {
         if (yPos > pageHeight - 80) {
           pdf.addPage();
-          yPos = margin;
         }
+        yPos = pageHeight - 35; // Absolute bottom positioning
 
-        const signatureWidth = 60;
+        const signatureWidth = 50;
         const signatureHeight = 20;
         const spacing = (contentWidth - (signatureWidth * 3)) / 2;
-        
+
         let xPos = margin;
-        
+
         // RT Signature
         if (checklist.assinatura_rt) {
-          pdf.addImage(checklist.assinatura_rt, "PNG", xPos, yPos, signatureWidth, signatureHeight);
-          pdf.setDrawColor(0, 0, 0);
-          pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
-          pdf.setFontSize(8);
-          pdf.setFont("helvetica", "normal");
-          pdf.text("Responsável Técnico", xPos + signatureWidth / 2, yPos + signatureHeight + 7, { align: "center" });
-          xPos += signatureWidth + spacing;
+          pdf.addImage(checklist.assinatura_rt, "PNG", xPos, yPos - signatureHeight, signatureWidth, signatureHeight);
         }
-        
+        pdf.setDrawColor(0, 0, 0);
+        pdf.line(xPos, yPos + 2, xPos + signatureWidth, yPos + 2);
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(checklist.responsavel_inspecao || "RT", xPos + signatureWidth / 2, yPos + 7, { align: "center" });
+        pdf.setFont("helvetica", "normal");
+        pdf.text("Responsável Técnico", xPos + signatureWidth / 2, yPos + 11, { align: "center" });
+        xPos += signatureWidth + spacing;
+
         // Client Signature
         if (checklist.assinatura_cliente) {
-          pdf.addImage(checklist.assinatura_cliente, "PNG", xPos, yPos, signatureWidth, signatureHeight);
-          pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
-          pdf.text("Dono do Estabelecimento", xPos + signatureWidth / 2, yPos + signatureHeight + 7, { align: "center" });
-          xPos += signatureWidth + spacing;
+          pdf.addImage(checklist.assinatura_cliente, "PNG", xPos, yPos - signatureHeight, signatureWidth, signatureHeight);
         }
-        
-        // Witness placeholder (optional - only show if both signatures exist)
-        if (checklist.assinatura_rt && checklist.assinatura_cliente) {
-          pdf.line(xPos, yPos + signatureHeight, xPos + signatureWidth, yPos + signatureHeight);
-          pdf.text("Testemunha", xPos + signatureWidth / 2, yPos + signatureHeight + 5, { align: "center" });
+        pdf.line(xPos, yPos + 2, xPos + signatureWidth, yPos + 2);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(checklist.nome_cliente_assinatura || "Dono/Gerente", xPos + signatureWidth / 2, yPos + 7, { align: "center" });
+        pdf.setFont("helvetica", "normal");
+        pdf.text("Dono do Estabelecimento", xPos + signatureWidth / 2, yPos + 11, { align: "center" });
+        xPos += signatureWidth + spacing;
+
+        // Witness Signature
+        if (checklist.assinatura_testemunha) {
+          pdf.addImage(checklist.assinatura_testemunha, "PNG", xPos, yPos - signatureHeight, signatureWidth, signatureHeight);
         }
-        
+        pdf.line(xPos, yPos + 2, xPos + signatureWidth, yPos + 2);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(checklist.nome_testemunha_assinatura || "", xPos + signatureWidth / 2, yPos + 7, { align: "center" });
+        pdf.setFont("helvetica", "normal");
+        pdf.text("Testemunha", xPos + signatureWidth / 2, yPos + 11, { align: "center" });
+
         yPos += signatureHeight + 15;
       }
 
-      // FOOTER
-      yPos = pageHeight - 15;
-      pdf.setFontSize(8);
-      pdf.setFont("helvetica", "italic");
-      pdf.setTextColor(120, 120, 120);
-      const footerText = companyName ? `${companyName} | RT-Checklist` : "RT-Checklist";
-      pdf.text(footerText, pageWidth / 2, yPos, { align: "center" });
-      pdf.setFontSize(7);
-      pdf.text(`Gerado automaticamente em ${format(new Date(), "dd/MM/yyyy")} às ${format(new Date(), "HH:mm")}`, 
-        pageWidth / 2, yPos + 4, { align: "center" });
+      // WATERMARK BRANDED FOOTER - Adds to all pages
+      const pageCount = (pdf as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        const footerY = pageHeight - 12;
+
+        // Separator Line
+        pdf.setDrawColor(220, 220, 220);
+        pdf.setLineWidth(0.1);
+        pdf.line(margin, footerY - 8, pageWidth - margin, footerY - 8);
+
+        // "Gerado automaticamente por"
+        pdf.setFontSize(6);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(150, 150, 150);
+        pdf.text("Gerado automaticamente por", pageWidth / 2, footerY - 4, { align: "center" });
+
+        // RT Expert Branding
+        pdf.setFontSize(10);
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFont("helvetica", "bold");
+        const rtWidth = pdf.getTextWidth("RT ");
+        const expertWidth = pdf.getTextWidth("Expert");
+        const totalWidth = rtWidth + expertWidth;
+        const startX = (pageWidth - totalWidth) / 2;
+
+        pdf.text("RT ", startX, footerY);
+
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(59, 130, 246); // Stitch Blue
+        pdf.text("Expert", startX + rtWidth, footerY);
+
+        // Subtitle
+        pdf.setFontSize(5);
+        pdf.setTextColor(160, 160, 160);
+        pdf.setFont("helvetica", "normal");
+        pdf.text("GESTÃO INTELIGENTE", pageWidth / 2, footerY + 3.5, { align: "center" });
+
+        // Page number
+        pdf.setFontSize(6);
+        pdf.setTextColor(180, 180, 180);
+        pdf.text(`Página ${i} de ${pageCount}`, pageWidth - margin, footerY + 3.5, { align: "right" });
+      }
 
       pdf.save(`Checklist_${checklist.clientes.razao_social}_${format(new Date(checklist.data_aplicacao), "dd-MM-yyyy")}.pdf`);
       toast.success("PDF gerado com sucesso!");
@@ -490,9 +600,9 @@ const ChecklistsProntos = () => {
                         <Download className="w-4 h-4 mr-2" />
                         Baixar PDF
                       </Button>
-                      <Button 
-                        onClick={() => handleDelete(checklist.id)} 
-                        size="sm" 
+                      <Button
+                        onClick={() => handleDelete(checklist.id)}
+                        size="sm"
                         variant="destructive"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -526,8 +636,19 @@ const ChecklistsProntos = () => {
         {/* View Dialog */}
         <Dialog open={viewingChecklist !== null} onOpenChange={() => setViewingChecklist(null)}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{viewingChecklist?.modelos_checklist.nome_modelo}</DialogTitle>
+            <DialogHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between border-b pb-4 gap-4 pr-6">
+              <div>
+                <DialogTitle className="text-xl font-bold uppercase tracking-wider text-primary">
+                  {viewingChecklist?.modelos_checklist.nome_modelo}
+                </DialogTitle>
+                <div className="text-sm mt-1 text-muted-foreground">Relatório de Inspeção</div>
+              </div>
+              {logoUrl && (
+                <div className="flex flex-col sm:items-end">
+                  <img src={logoUrl} alt="Logo" className="h-12 w-auto object-contain rounded-md bg-white border p-1" />
+                  {companyName && <span className="text-xs text-muted-foreground mt-2 font-medium">{companyName}</span>}
+                </div>
+              )}
             </DialogHeader>
             {viewingChecklist && (
               <div className="space-y-4">
@@ -562,47 +683,65 @@ const ChecklistsProntos = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {viewingChecklist.modelos_checklist.estrutura_json?.campos.map((campo: any, index: number) => {
-                            if (campo.tipo === "titulo") {
-                              return (
-                                <tr key={campo.id} className="bg-accent/50">
+                          {(() => {
+                            const secoes = viewingChecklist.modelos_checklist.estrutura_json?.secoes ||
+                              (viewingChecklist.modelos_checklist.estrutura_json?.campos ? [{ id: 'default', titulo: '', campos: viewingChecklist.modelos_checklist.estrutura_json.campos }] : []);
+
+                            let itemIndex = 1;
+
+                            return secoes.flatMap((secao: any) => [
+                              secao.titulo ? (
+                                <tr key={`sec-${secao.id}`} className="bg-accent/50">
                                   <td colSpan={3} className="p-2 font-bold text-primary">
-                                    {campo.label}
+                                    {secao.titulo}
                                   </td>
                                 </tr>
-                              );
-                            }
-                            if (campo.tipo === "descricao") {
-                              return (
-                                <tr key={campo.id} className="bg-muted/30">
-                                  <td colSpan={3} className="p-2 text-xs italic text-muted-foreground">
-                                    {campo.label}
-                                  </td>
-                                </tr>
-                              );
-                            }
+                              ) : null,
+                              ...(secao.campos || []).map((campo: any) => {
+                                if (campo.tipo === "titulo") {
+                                  return (
+                                    <tr key={campo.id} className="bg-muted/10">
+                                      <td colSpan={3} className="p-2 font-bold text-primary">
+                                        {campo.label}
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+                                if (campo.tipo === "descricao") {
+                                  return (
+                                    <tr key={campo.id} className="bg-muted/5">
+                                      <td colSpan={3} className="p-2 text-xs italic text-muted-foreground">
+                                        {campo.label}
+                                      </td>
+                                    </tr>
+                                  );
+                                }
 
-                            const resposta = viewingChecklist.respostas_json?.[campo.id];
-                            const outrosText = viewingChecklist.respostas_json?.[`${campo.id}_outros_text`];
-                            let respostaText = "---";
-                            
-                            if (Array.isArray(resposta)) {
-                              respostaText = resposta.join(", ");
-                              if (outrosText) {
-                                respostaText += ` (${outrosText})`;
-                              }
-                            } else if (resposta !== undefined && resposta !== null && resposta !== "") {
-                              respostaText = String(resposta);
-                            }
+                                const resposta = viewingChecklist.respostas_json?.[campo.id];
+                                const outrosText = viewingChecklist.respostas_json?.[`${campo.id}_outros_text`];
+                                let respostaText = "---";
 
-                            return (
-                              <tr key={campo.id} className="border-t">
-                                <td className="p-2 text-center font-semibold">{index + 1}</td>
-                                <td className="p-2">{campo.label}</td>
-                                <td className="p-2">{respostaText}</td>
-                              </tr>
-                            );
-                          })}
+                                if (Array.isArray(resposta) && resposta.length > 0) {
+                                  respostaText = resposta.join(", ");
+                                  if (outrosText && respostaText.includes("Outros")) {
+                                    respostaText = respostaText.replace("Outros", `Outros (${outrosText})`);
+                                  } else if (outrosText) {
+                                    respostaText += ` (${outrosText})`;
+                                  }
+                                } else if (resposta !== undefined && resposta !== null && resposta !== "") {
+                                  respostaText = String(resposta);
+                                }
+
+                                return (
+                                  <tr key={campo.id} className="border-t">
+                                    <td className="p-2 text-center font-semibold">{itemIndex++}</td>
+                                    <td className="p-2">{campo.label}</td>
+                                    <td className="p-2">{respostaText}</td>
+                                  </tr>
+                                );
+                              })
+                            ]);
+                          })()}
                         </tbody>
                       </table>
                     </div>
