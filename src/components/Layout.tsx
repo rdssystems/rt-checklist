@@ -16,10 +16,24 @@ import {
   Settings as SettingsIcon,
   CheckSquare,
   Search,
-  Bell
+  Bell,
+  User as UserIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
 
 interface LayoutProps {
   children: ReactNode;
@@ -33,6 +47,7 @@ const Layout = ({ children }: LayoutProps) => {
   const [companyName, setCompanyName] = useState("RT-Expert");
   const [logoUrl, setLogoUrl] = useState("");
   const [userName, setUserName] = useState("Usuário");
+  const [avatarUrl, setAvatarUrl] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -59,14 +74,17 @@ const Layout = ({ children }: LayoutProps) => {
   const loadSettings = async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("company_name, logo_url, nome_rt")
+      .select("company_name, logo_url, nome_rt, avatar_url")
       .eq("id", userId)
       .maybeSingle();
 
-    if (data) {
-      setCompanyName(data.company_name || "RT-Expert");
-      setLogoUrl(data.logo_url || "");
-      setUserName(data.nome_rt || "Usuário");
+    const profileData = data as any;
+
+    if (profileData) {
+      setCompanyName(profileData.company_name || "RT-Expert");
+      setLogoUrl(profileData.logo_url || "");
+      setUserName(profileData.nome_rt || "Usuário");
+      setAvatarUrl(profileData.avatar_url || "");
     }
   };
 
@@ -135,7 +153,7 @@ const Layout = ({ children }: LayoutProps) => {
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">
       {/* Sidebar Desktop */}
-      <aside className="hidden md:flex w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-col">
+      <aside className="hidden md:flex w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-col shrink-0">
         <div className="p-6 flex items-center gap-3">
           {logoUrl ? (
             <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 bg-white" />
@@ -209,15 +227,40 @@ const Layout = ({ children }: LayoutProps) => {
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
             </button>
             <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-800 mx-2"></div>
-            <div className="flex items-center gap-3 group">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">{userName}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Responsável Técnico</p>
-              </div>
-              <div className="size-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold ring-2 ring-slate-100 dark:ring-slate-800 group-hover:ring-primary transition-all">
-                {userName.charAt(0).toUpperCase()}
-              </div>
-            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-3 group outline-none cursor-pointer">
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white leading-tight group-hover:text-primary transition-colors">
+                    {userName}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Responsável Técnico</p>
+                </div>
+                <Avatar className="size-9 ring-2 ring-slate-100 dark:ring-slate-800 group-hover:ring-primary transition-all">
+                  <AvatarImage src={avatarUrl} />
+                  <AvatarFallback className="bg-primary/20 text-primary font-bold">
+                    {userName.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 mr-4 mt-2" align="end">
+                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/settings")} className="cursor-pointer">
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  <span>Perfil / Empresa</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/settings")} className="cursor-pointer">
+                  <SettingsIcon className="mr-2 h-4 w-4" />
+                  <span>Configurações</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sair</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
@@ -300,7 +343,7 @@ const Layout = ({ children }: LayoutProps) => {
         </div>
 
         {/* Content Scrollable Area */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
           {children}
         </main>
       </div>
