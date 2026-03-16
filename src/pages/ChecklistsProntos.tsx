@@ -710,28 +710,48 @@ const ChecklistsProntos = () => {
         ) : (
           <div className="grid gap-4">
             {filteredChecklists.map((checklist) => (
-              <Card key={checklist.id} className="overflow-hidden">
-                <CardHeader className="space-y-4">
-                  <CardTitle className="text-xl leading-tight text-primary">
-                    {checklist.modelos_checklist.nome_modelo}
-                  </CardTitle>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <Card key={checklist.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <div className="p-4 md:py-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-primary truncate">
+                      {checklist.modelos_checklist.nome_modelo}
+                    </h3>
+                    
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-slate-500">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Building2 className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{checklist.clientes.razao_social}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Calendar className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {format(new Date(checklist.data_aplicacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                        </span>
+                      </div>
+                      {checklist.responsavel_inspecao && (
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <User className="w-3.5 h-3.5 shrink-0" />
+                          <span className="italic truncate">Por: {checklist.responsavel_inspecao}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 justify-end">
                     <Button 
                       onClick={() => setViewingChecklist(checklist)} 
                       size="sm" 
                       variant="outline" 
-                      className="w-full justify-center h-10"
+                      className="h-8 md:h-9"
                     >
                       <Eye className="w-4 h-4 mr-2" />
-                      <span className="hidden xs:inline">Visualizar</span>
-                      <span className="xs:hidden">Ver</span>
+                      Visualizar
                     </Button>
                     <Button 
                       onClick={() => generatePDF(checklist)} 
                       size="sm" 
                       variant="secondary" 
-                      className="w-full justify-center h-10 bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
+                      className="h-8 md:h-9 bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
                     >
                       <Download className="w-4 h-4 mr-2" />
                       PDF
@@ -740,38 +760,13 @@ const ChecklistsProntos = () => {
                       onClick={() => handleDelete(checklist.id)}
                       size="sm"
                       variant="ghost"
-                      className="w-full justify-center h-10 text-destructive hover:bg-destructive/10 col-span-2 sm:col-span-1"
+                      className="h-8 w-8 md:h-9 md:w-9 p-0 text-destructive hover:bg-destructive/10"
+                      title="Excluir"
                     >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Excluir
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
-
-                  <CardDescription className="space-y-2 pt-4 border-t border-dashed">
-                    <div className="flex items-center gap-2 group">
-                      <div className="p-1.5 rounded-full bg-slate-50 text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                        <Building2 className="w-3.5 h-3.5" />
-                      </div>
-                      <span className="font-medium text-slate-700">{checklist.clientes.razao_social}</span>
-                    </div>
-                    <div className="flex items-center gap-2 group">
-                      <div className="p-1.5 rounded-full bg-slate-50 text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                        <Calendar className="w-3.5 h-3.5" />
-                      </div>
-                      <span className="text-slate-600">
-                        {format(new Date(checklist.data_aplicacao), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
-                      </span>
-                    </div>
-                    {checklist.responsavel_inspecao && (
-                      <div className="flex items-center gap-2 group">
-                        <div className="p-1.5 rounded-full bg-slate-50 text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                          <User className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-slate-600 italic">Aplicado por: {checklist.responsavel_inspecao}</span>
-                      </div>
-                    )}
-                  </CardDescription>
-                </CardHeader>
+                </div>
               </Card>
             ))}
           </div>

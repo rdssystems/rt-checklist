@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, ClipboardList, FileCheck, TrendingUp, Filter, Plus, Map } from "lucide-react";
+import { Users, ClipboardList, FileCheck, TrendingUp, Filter, Plus, Map, CalendarDays } from "lucide-react";
+import { startOfMonth, endOfMonth } from "date-fns";
 import Layout from "@/components/Layout";
 
 const Dashboard = () => {
@@ -10,6 +11,7 @@ const Dashboard = () => {
     clientes: 0,
     modelos: 0,
     aplicacoes: 0,
+    agendamentosMes: 0,
   });
 
   useEffect(() => {
@@ -17,16 +19,24 @@ const Dashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [clientes, modelos, aplicacoes] = await Promise.all([
+      const start = startOfMonth(new Date()).toISOString();
+      const end = endOfMonth(new Date()).toISOString();
+
+      const [clientes, modelos, aplicacoes, agendamentos] = await Promise.all([
         supabase.from("clientes").select("id", { count: "exact" }),
         supabase.from("modelos_checklist").select("id", { count: "exact" }),
         supabase.from("aplicacoes_checklist").select("id", { count: "exact" }),
+        (supabase as any).from("agendamentos")
+          .select("id", { count: "exact" })
+          .gte("data_visita", start)
+          .lte("data_visita", end),
       ]);
 
       setStats({
         clientes: clientes.count || 0,
         modelos: modelos.count || 0,
         aplicacoes: aplicacoes.count || 0,
+        agendamentosMes: agendamentos.count || 0,
       });
     };
 
@@ -56,7 +66,7 @@ const Dashboard = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
             <div className="flex items-center justify-between mb-4">
               <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-primary rounded-lg transition-colors group-hover:bg-primary group-hover:text-white">
@@ -65,7 +75,7 @@ const Dashboard = () => {
             </div>
             <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Total de Clientes</p>
             <h3 className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{stats.clientes}</h3>
-            <p className="text-slate-400 text-xs mt-2">Empresas cadastradas no sistema</p>
+            <p className="text-slate-400 text-xs mt-2">Empresas cadastradas</p>
           </div>
 
           <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
@@ -74,9 +84,9 @@ const Dashboard = () => {
                 <ClipboardList className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Modelos de Checklist</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Modelos</p>
             <h3 className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{stats.modelos}</h3>
-            <p className="text-slate-400 text-xs mt-2">Templates criados e disponíveis</p>
+            <p className="text-slate-400 text-xs mt-2">Templates disponíveis</p>
           </div>
 
           <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
@@ -85,44 +95,25 @@ const Dashboard = () => {
                 <FileCheck className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Checklists Aplicados</p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Checklists</p>
             <h3 className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{stats.aplicacoes}</h3>
-            <p className="text-slate-400 text-xs mt-2">Inspeções já realizadas</p>
+            <p className="text-slate-400 text-xs mt-2">Inspeções realizadas</p>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-lg transition-colors group-hover:bg-purple-600 group-hover:text-white">
+                <CalendarDays className="w-5 h-5" />
+              </div>
+            </div>
+            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Visitas no Mês</p>
+            <h3 className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{stats.agendamentosMes}</h3>
+            <p className="text-slate-400 text-xs mt-2">Agendamentos neste mês</p>
           </div>
         </div>
 
-        {/* Resources & Next Steps - Following Stitch Design Patterns */}
-        <div className="grid lg:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-lg font-bold text-slate-900 dark:text-white">Próximos Passos</h4>
-                <p className="text-sm text-slate-500">Mantenha seu fluxo de trabalho organizado</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-start gap-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 transition-colors hover:bg-primary/5 hover:border-primary/20">
-                <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                <div>
-                  <h5 className="font-medium text-sm text-slate-900 dark:text-slate-100">Cadastre mais clientes</h5>
-                  <p className="text-xs text-slate-500 mt-1">Vá na aba Clientes para adicionar novas empresas ao seu portfólio.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4 p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 transition-colors hover:bg-emerald-500/5 hover:border-emerald-500/20">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 mt-2 flex-shrink-0" />
-                <div>
-                  <h5 className="font-medium text-sm text-slate-900 dark:text-slate-100">Crie Modelos Inteligentes</h5>
-                  <p className="text-xs text-slate-500 mt-1">Utilize o Criador de Checklists para padronizar suas vistorias.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
+        {/* Resources Section */}
+        <div className="grid lg:grid-cols-1 gap-6">
           <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg">
@@ -134,32 +125,26 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <div className="space-y-4 text-sm">
-              <div className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-800 pb-4">
-                <div className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
-                  <span className="bg-blue-100 text-blue-600 p-1.5 rounded-md dark:bg-blue-900/30">
-                    <FileCheck className="w-4 h-4" />
-                  </span>
-                  Inspeções Offline e Assinatura Digital
-                </div>
+            <div className="grid md:grid-cols-3 gap-4 text-sm">
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-50/50 border border-blue-100 dark:bg-blue-900/10 dark:border-blue-900/20">
+                <span className="bg-blue-100 text-blue-600 p-1.5 rounded-md dark:bg-blue-900/30">
+                  <FileCheck className="w-4 h-4" />
+                </span>
+                <span className="font-medium">Relatórios em tempo real</span>
               </div>
 
-              <div className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-800 pb-4">
-                <div className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
-                  <span className="bg-indigo-100 text-indigo-600 p-1.5 rounded-md dark:bg-indigo-900/30">
-                    <Users className="w-4 h-4" />
-                  </span>
-                  Controle CRM dos Estabelecimentos
-                </div>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-indigo-50/50 border border-indigo-100 dark:bg-indigo-900/10 dark:border-indigo-900/20">
+                <span className="bg-indigo-100 text-indigo-600 p-1.5 rounded-md dark:bg-indigo-900/30">
+                  <Users className="w-4 h-4" />
+                </span>
+                <span className="font-medium">Gestão de CRM</span>
               </div>
 
-              <div className="flex items-center justify-between p-3">
-                <div className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
-                  <span className="bg-purple-100 text-purple-600 p-1.5 rounded-md dark:bg-purple-900/30">
-                    <Map className="w-4 h-4" />
-                  </span>
-                  Geolocalização das Fiscalizações
-                </div>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-purple-50/50 border border-purple-100 dark:bg-purple-900/10 dark:border-purple-900/20">
+                <span className="bg-purple-100 text-purple-600 p-1.5 rounded-md dark:bg-purple-900/30">
+                  <Map className="w-4 h-4" />
+                </span>
+                <span className="font-medium">Sincronização Google</span>
               </div>
             </div>
           </div>
