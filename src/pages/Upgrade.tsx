@@ -5,15 +5,30 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Check, Sparkles, Zap, ShieldCheck, Map, Calendar, FileText, Smartphone, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 import { useState, useEffect } from "react";
 import { getPlanStatus, type PlanStatus } from "@/lib/plan-limits";
+import { supabase } from "@/integrations/supabase/client";
 
 const Upgrade = () => {
   const navigate = useNavigate();
   const [planStatus, setPlanStatus] = useState<PlanStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [showCpfDialog, setShowCpfDialog] = useState(false);
+  const [tempCpf, setTempCpf] = useState("");
+  const [pendingPlanType, setPendingPlanType] = useState<'RECURRING' | 'SINGLE' | null>(null);
+  const [savingCpf, setSavingCpf] = useState(false);
 
   useEffect(() => {
     getPlanStatus().then(status => {
@@ -47,15 +62,38 @@ const Upgrade = () => {
         return;
       }
 
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("cpf_cnpj, nome_rt")
+        .eq("id", user.id)
+        .single();
+      
+      if (!profile?.cpf_cnpj) {
+        setPendingPlanType(type);
+        setShowCpfDialog(true);
+        setPaying(false);
+        return;
+      }
+
+      await executeCheckout(type, user.id, user.email, profile.nome_rt, profile.cpf_cnpj);
+    } catch (error: any) {
+      console.error(error);
+      toast.error("Erro ao iniciar checkout: " + error.message);
+      setPaying(false);
+    }
+  };
+
+  const executeCheckout = async (type: 'RECURRING' | 'SINGLE', userId: string, email: string | undefined, name: string | null, cpfCnpj: string) => {
+    try {
       const response = await fetch('/api/asaas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           type, 
-          userId: user.id,
-          email: user.email,
-          name: profile.nome_rt || 'Cliente RT Expert',
-          cpfCnpj: profile.cpf_cnpj
+          userId,
+          email,
+          name: name || 'Cliente RT Expert',
+          cpfCnpj
         }),
       });
 
@@ -63,17 +101,53 @@ const Upgrade = () => {
       
       if (!response.ok) throw new Error(result.error || "Erro ao processar pagamento");
 
-      // Redirecionar para o checkout do Asaas
       if (result.url) {
         window.location.href = result.url;
       } else {
         throw new Error("URL de checkout não recebida");
       }
     } catch (error: any) {
-      console.error(error);
-      toast.error("Erro ao iniciar checkout: " + error.message);
-    } finally {
+      toast.error(error.message);
       setPaying(false);
+    }
+  };
+
+  const handleCpfSubmit = async () => {
+    if (!tempCpf || tempCpf.length < 11) {
+      toast.error("Informe um CPF ou CNPJ válido");
+      return;
+    }
+
+    setSavingCpf(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não encontrado");
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ cpf_cnpj: tempCpf })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      toast.success("Documento salvo com sucesso!");
+      setShowCpfDialog(false);
+      
+      // Continuar para o pagamento
+      if (pendingPlanType) {
+        setPaying(true);
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("nome_rt")
+          .eq("id", user.id)
+          .single();
+          
+        await executeCheckout(pendingPlanType, user.id, user.email, profile?.nome_rt, tempCpf);
+      }
+    } catch (error: any) {
+      toast.error("Erro ao salvar documento: " + error.message);
+    } finally {
+      setSavingCpf(false);
     }
   };
 
@@ -254,6 +328,50 @@ const Upgrade = () => {
            </button>
         </div>
       </div>
+
+      {/* Dialog para solicitar CPF/CNPJ */}
+      <Dialog open={showCpfDialog} onOpenChange={setShowCpfDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Informe seu CPF ou CNPJ</DialogTitle>
+            <DialogDescription>
+              Necessário para processar o pagamento e emitir sua nota fiscal no Asaas. Esse dado será salvo no seu perfil.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="cpf_cnpj_dialog">Documento (apenas números)</Label>
+              <Input
+                id="cpf_cnpj_dialog"
+                placeholder="Ex: 00000000000"
+                value={tempCpf}
+                onChange={(e) => setTempCpf(e.target.value.replace(/\D/g, ""))}
+                maxLength={14}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCpfDialog(false)}
+              disabled={savingCpf}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleCpfSubmit}
+              disabled={savingCpf || !tempCpf}
+            >
+              {savingCpf ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : "Confirmar e Pagar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };
