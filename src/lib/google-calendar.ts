@@ -56,11 +56,17 @@ export async function syncToGoogleCalendar(visita: any) {
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error("Erro na Google Calendar API:", errorData);
+      console.error("ERRO DETALHADO GOOGLE API:", errorData);
+      
+      if (errorData.error?.code === 401) {
+        return "reconnect_required";
+      }
+      
       throw new Error(errorData.error?.message || "Erro ao criar evento no Google");
     }
 
     const createdEvent = await response.json();
+    console.log("Evento criado com sucesso no Google ID:", createdEvent.id);
     return createdEvent.id;
 
   } catch (error) {

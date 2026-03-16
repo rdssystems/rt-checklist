@@ -158,30 +158,36 @@ const Settings = () => {
   };
 
   const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
+    flow: 'auth-code',
+    onSuccess: async (codeResponse) => {
       setGoogleLoading(true);
       try {
-        const { access_token } = tokenResponse;
+        const { code } = codeResponse;
         
-        // Em um app de produção, usaríamos o refresh token através de um servidor.
-        // Aqui vamos salvar o access token diretamente para fins de MVP.
-        const { error } = await supabase
-          .from("profiles")
-          .update({
-             // @ts-ignore
-            google_access_token: access_token,
-             // @ts-ignore
-            google_token_expiry: new Date(Date.now() + 3600 * 1000).toISOString()
-          })
-          .eq("id", userId);
+        // Agora enviamos esse 'code' para uma função que vai trocar pelo token permanente
+        // Por enquanto, vamos salvar o log para você ver
+        console.log("Código de autorização recebido:", code);
+        
+        // Aqui chamaremos a Edge Function no futuro. 
+        // Para manter funcionando agora, vamos apenas avisar que o código foi capturado
+        toast.info("Autorização recebida! Salvando acesso permanente...");
+        
+        // Enviar o código para nossa API na Vercel
+        const response = await fetch('/api/google-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, userId }),
+        });
 
-        if (error) throw error;
+        const result = await response.json();
         
+        if (!response.ok) throw new Error(result.error || "Erro na API de autenticação");
+
         setGoogleConnected(true);
-        toast.success("Google Agenda conectado com sucesso!");
-      } catch (error) {
-        console.error("Erro ao salvar token do Google:", error);
-        toast.error("Erro ao conectar com Google Agenda");
+        toast.success("Google Agenda conectado com acesso permanente!");
+      } catch (error: any) {
+        console.error("Erro ao processar acesso permanente:", error);
+        toast.error("Erro ao habilitar acesso permanente: " + error.message);
       } finally {
         setGoogleLoading(false);
       }
@@ -189,7 +195,9 @@ const Settings = () => {
     onError: () => {
       toast.error("Falha na autenticação com o Google");
     },
-    scope: 'https://www.googleapis.com/auth/calendar.events',
+    scope: 'openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar',
+    // @ts-ignore
+    prompt: 'consent',
   });
 
   const disconnectGoogle = async () => {
