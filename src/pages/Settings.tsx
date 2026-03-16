@@ -150,10 +150,10 @@ const Settings = () => {
       cpf_cnpj: cpfCnpj || null,
     };
 
-    const { error } = await supabase
+    const { error } = await (supabase
       .from("profiles")
-      .update(dataToUpdate)
-      .eq("id", userId);
+      .update(dataToUpdate as any)
+      .eq("id", userId) as any);
 
     if (error) {
       toast.error("Erro ao salvar configurações");

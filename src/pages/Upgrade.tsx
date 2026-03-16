@@ -48,25 +48,11 @@ const Upgrade = () => {
         return;
       }
 
-      const { data: profile } = await (await import("@/integrations/supabase/client")).supabase
+      const { data: profile } = await (supabase
         .from("profiles")
         .select("cpf_cnpj, nome_rt")
         .eq("id", user.id)
-        .single();
-      
-      if (!profile?.cpf_cnpj) {
-        toast.error("CPF ou CNPJ obrigatório", {
-          description: "Por favor, preencha seu CPF/CNPJ nas configurações antes de assinar."
-        });
-        navigate("/settings");
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("cpf_cnpj, nome_rt")
-        .eq("id", user.id)
-        .single();
+        .single() as any);
       
       if (!profile?.cpf_cnpj) {
         setPendingPlanType(type);
@@ -123,10 +109,10 @@ const Upgrade = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não encontrado");
 
-      const { error } = await supabase
+      const { error } = await (supabase
         .from("profiles")
-        .update({ cpf_cnpj: tempCpf })
-        .eq("id", user.id);
+        .update({ cpf_cnpj: tempCpf } as any)
+        .eq("id", user.id) as any);
 
       if (error) throw error;
 
@@ -136,11 +122,11 @@ const Upgrade = () => {
       // Continuar para o pagamento
       if (pendingPlanType) {
         setPaying(true);
-        const { data: profile } = await supabase
+        const { data: profile } = await (supabase
           .from("profiles")
           .select("nome_rt")
           .eq("id", user.id)
-          .single();
+          .single() as any);
           
         await executeCheckout(pendingPlanType, user.id, user.email, profile?.nome_rt, tempCpf);
       }
