@@ -4,7 +4,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { type, userId, email, name } = req.body;
+  const { type, userId, email, name, cpfCnpj } = req.body;
   const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
   const isProd = process.env.NODE_ENV === 'production';
   const ASAAS_URL = isProd ? 'https://www.asaas.com/api/v3' : 'https://sandbox.asaas.com/api/v3';
@@ -34,6 +34,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({ 
           name, 
           email,
+          cpfCnpj,
           externalReference: userId
         })
       });

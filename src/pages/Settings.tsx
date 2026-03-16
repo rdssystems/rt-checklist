@@ -21,6 +21,7 @@ const Settings = () => {
   const [nomeRT, setNomeRT] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [cpfCnpj, setCpfCnpj] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -41,7 +42,7 @@ const Settings = () => {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("company_name, logo_url, nome_rt, email, avatar_url, google_access_token")
+      .select("company_name, logo_url, nome_rt, email, avatar_url, google_access_token, cpf_cnpj")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -59,6 +60,7 @@ const Settings = () => {
       setEmail(profileData.email || "");
       setAvatarUrl(profileData.avatar_url || "");
       setGoogleConnected(!!profileData.google_access_token);
+      setCpfCnpj(profileData.cpf_cnpj || "");
       
       const now = new Date();
       const trialEnds = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
@@ -140,14 +142,17 @@ const Settings = () => {
 
     setLoading(true);
 
+    const dataToUpdate = {
+      company_name: companyName || null,
+      logo_url: logoUrl || null,
+      nome_rt: nomeRT || null,
+      avatar_url: avatarUrl || null,
+      cpf_cnpj: cpfCnpj || null,
+    };
+
     const { error } = await supabase
       .from("profiles")
-      .update({
-        company_name: companyName || null,
-        logo_url: logoUrl || null,
-        nome_rt: nomeRT || null,
-        avatar_url: avatarUrl || null,
-      })
+      .update(dataToUpdate)
       .eq("id", userId);
 
     if (error) {
@@ -306,6 +311,22 @@ const Settings = () => {
                 <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3" /> E-mail vinculado à conta
                 </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cpfCnpj" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">CPF ou CNPJ (Para Faturamento)</Label>
+                <div className="relative">
+                  <ShieldCheck className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="cpfCnpj"
+                    placeholder="Somente números"
+                    value={cpfCnpj}
+                    onChange={(e) => setCpfCnpj(e.target.value.replace(/\D/g, ''))}
+                    className="pl-10 h-11"
+                    maxLength={14}
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Obrigatório para emissão de nota fiscal e ativação do plano Expert.</p>
+                </div>
               </div>
 
               <div className="pt-4">

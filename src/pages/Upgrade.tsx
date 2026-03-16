@@ -33,6 +33,20 @@ const Upgrade = () => {
         return;
       }
 
+      const { data: profile } = await (await import("@/integrations/supabase/client")).supabase
+        .from("profiles")
+        .select("cpf_cnpj, nome_rt")
+        .eq("id", user.id)
+        .single();
+      
+      if (!profile?.cpf_cnpj) {
+        toast.error("CPF ou CNPJ obrigatório", {
+          description: "Por favor, preencha seu CPF/CNPJ nas configurações antes de assinar."
+        });
+        navigate("/settings");
+        return;
+      }
+
       const response = await fetch('/api/asaas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -40,7 +54,8 @@ const Upgrade = () => {
           type, 
           userId: user.id,
           email: user.email,
-          name: user.user_metadata?.nome_rt || 'Cliente RT Expert'
+          name: profile.nome_rt || 'Cliente RT Expert',
+          cpfCnpj: profile.cpf_cnpj
         }),
       });
 
