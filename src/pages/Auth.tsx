@@ -15,6 +15,8 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nomeRT, setNomeRT] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({
@@ -51,7 +53,7 @@ const Auth = () => {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/`,
+        emailRedirectTo: `${window.location.origin}/auth`,
         data: {
           nome_rt: nomeRT
         }
@@ -61,7 +63,29 @@ const Auth = () => {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Cadastro realizado com sucesso!");
+      toast.success("Cadastro realizado! Verifique seu e-mail para confirmar a conta.", {
+        duration: 8000,
+      });
+    }
+  };
+
+  const handleForgotPassword = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast.error("Digite seu e-mail no campo acima para recuperar a senha");
+      return;
+    }
+    
+    setIsResetting(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth?type=recovery`,
+    });
+    setIsResetting(false);
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("E-mail de recuperação enviado! Verifique sua caixa de entrada.");
     }
   };
 
@@ -135,7 +159,14 @@ const Auth = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between ml-1">
                   <Label htmlFor="password-login" className="text-xs font-bold text-slate-500 uppercase">Senha</Label>
-                  <a href="#" className="text-xs font-semibold text-primary hover:underline">Esqueceu a senha?</a>
+                  <button 
+                    type="button" 
+                    onClick={handleForgotPassword}
+                    className="text-xs font-semibold text-primary hover:underline bg-transparent border-none p-0 cursor-pointer outline-none"
+                    disabled={isResetting}
+                  >
+                    {isResetting ? "Enviando..." : "Esqueceu a senha?"}
+                  </button>
                 </div>
                 <Input id="password-login" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required
                   className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-primary focus-visible:border-primary" />
