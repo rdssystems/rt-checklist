@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+
+<html lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RT-Expert | Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#3f68e4",
+                        "background-light": "#f9fafb",
+                        "background-dark": "#111521",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-size: 20px; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
+<div class="flex h-screen overflow-hidden">
+<!-- Sidebar Navigation -->
+<aside class="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
+<div class="p-6 flex items-center gap-3">
+<div class="bg-primary rounded-lg p-1.5 flex items-center justify-center text-white">
+<span class="material-symbols-outlined !text-2xl">grid_view</span>
+</div>
+<h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">RT-Expert</h1>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2.5 bg-primary/10 text-primary rounded-lg font-medium" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+<span>Clientes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors" href="#">
+<span class="material-symbols-outlined">edit_square</span>
+<span>Studio</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+<span>Agenda</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<span>Relatórios</span>
+</a>
+</nav>
+<div class="p-4 border-t border-slate-200 dark:border-slate-800">
+<a class="flex items-center gap-3 px-3 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Configurações</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+<!-- Header -->
+<header class="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 z-10">
+<div class="flex-1 max-w-xl">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">search</span>
+<input class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary transition-all" placeholder="Pesquisar por vistorias, clientes ou relatórios..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+</button>
+<div class="h-8 w-[1px] bg-slate-200 dark:bg-slate-800 mx-2"></div>
+<div class="flex items-center gap-3 cursor-pointer group">
+<div class="text-right hidden sm:block">
+<p class="text-sm font-semibold text-slate-900 dark:text-white leading-tight">Henrique Silva</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Admin Expert</p>
+</div>
+<img alt="Profile" class="size-9 rounded-full ring-2 ring-slate-100 dark:ring-slate-800 group-hover:ring-primary transition-all" data-alt="User profile photo showing professional male" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBfaHuLY6yAqcXmtyGeQReVDPLI-RGDt6HwqjgdninVWUH4w-m9HnOQNxZUPPamHC8eqmXKZX0sRYtCDKs2JTVBeZLHhqlXU0xX6JIMRkF36tDIE0LWfpGu-ap5Abtz7F7XtUV6755WUXluk_KSnt-M_Xydm_ESP_w_Po6vrsQjPk3g08vUuKSaR0MWIN4_sBhtkRz99_NXLk1mvJLA8JeYDXRyfcU4jFs0RRx_zeCzbWp425mb1iZ-U0lJK7Wu4mDCc58G61dsPq8"/>
+</div>
+</div>
+</header>
+<!-- Main Dashboard Body -->
+<main class="flex-1 overflow-y-auto p-8 space-y-8">
+<!-- Welcome Section -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h2 class="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Dashboard Geral</h2>
+<p class="text-slate-500 dark:text-slate-400 mt-1">Visão geral operacional e conformidade da empresa em tempo real.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm">
+<span class="material-symbols-outlined !text-lg">filter_list</span>
+                            Filtrar Período
+                        </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-all shadow-md shadow-primary/20">
+<span class="material-symbols-outlined !text-lg">add</span>
+                            Nova Vistoria
+                        </button>
+</div>
+</div>
+<!-- KPI Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Card 1 -->
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<div class="p-2 bg-blue-50 dark:bg-blue-900/20 text-primary rounded-lg">
+<span class="material-symbols-outlined">assignment_turned_in</span>
+</div>
+<span class="text-xs font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-full">+12.5%</span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Vistorias Realizadas</p>
+<h3 class="text-3xl font-bold text-slate-900 dark:text-white mt-1">1,284</h3>
+<p class="text-slate-400 text-xs mt-2">Relativo aos últimos 30 dias</p>
+</div>
+<!-- Card 2 -->
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<div class="p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 rounded-lg">
+<span class="material-symbols-outlined">pending_actions</span>
+</div>
+<span class="text-xs font-medium text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-full">Atenção</span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Pendências Ativas</p>
+<h3 class="text-3xl font-bold text-slate-900 dark:text-white mt-1">42</h3>
+<p class="text-slate-400 text-xs mt-2">Vistorias aguardando correção ou revisão</p>
+</div>
+<!-- Card 3 -->
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<div class="p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-lg">
+<span class="material-symbols-outlined">verified</span>
+</div>
+<span class="text-xs font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-full">Conforme</span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Nível Conformidade Médio</p>
+<h3 class="text-3xl font-bold text-slate-900 dark:text-white mt-1">94.2%</h3>
+<p class="text-slate-400 text-xs mt-2">Média global de conformidade técnica</p>
+</div>
+</div>
+<!-- Main Grid: Chart and Recent Activity -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Chart Placeholder (Monthly Trend) -->
+<div class="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between mb-6">
+<div>
+<h4 class="text-lg font-bold text-slate-900 dark:text-white">Tendência Mensal de Vistorias</h4>
+<p class="text-sm text-slate-500">Volume de inspeções vs Conformidade</p>
+</div>
+<select class="text-xs bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg focus:ring-primary cursor-pointer">
+<option>Últimos 6 meses</option>
+<option>Ano atual</option>
+</select>
+</div>
+<!-- Visual Mockup of a Trend Chart -->
+<div class="h-64 flex items-end justify-between gap-4 pt-4 border-b border-slate-100 dark:border-slate-800 pb-1 px-2">
+<div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+<div class="w-full bg-primary/20 rounded-t h-[40%] group-hover:bg-primary transition-all"></div>
+<span class="text-[10px] text-slate-400 font-medium">JAN</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+<div class="w-full bg-primary/20 rounded-t h-[55%] group-hover:bg-primary transition-all"></div>
+<span class="text-[10px] text-slate-400 font-medium">FEV</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+<div class="w-full bg-primary/20 rounded-t h-[75%] group-hover:bg-primary transition-all"></div>
+<span class="text-[10px] text-slate-400 font-medium">MAR</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+<div class="w-full bg-primary/20 rounded-t h-[65%] group-hover:bg-primary transition-all"></div>
+<span class="text-[10px] text-slate-400 font-medium">ABR</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+<div class="w-full bg-primary/30 rounded-t h-[85%] group-hover:bg-primary transition-all"></div>
+<span class="text-[10px] text-slate-400 font-medium font-bold text-primary">MAI</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+<div class="w-full bg-primary rounded-t h-[95%]"></div>
+<span class="text-[10px] text-slate-900 dark:text-white font-bold">JUN</span>
+</div>
+</div>
+<div class="mt-4 flex items-center gap-6">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-primary"></span>
+<span class="text-xs text-slate-500">Volume Total</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+<span class="text-xs text-slate-500">Conformidade (%)</span>
+</div>
+</div>
+</div>
+<!-- Recent Activity/List -->
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+<div class="flex items-center justify-between mb-6">
+<h4 class="text-lg font-bold text-slate-900 dark:text-white">Vistorias Recentes</h4>
+<button class="text-xs text-primary font-semibold hover:underline">Ver todas</button>
+</div>
+<div class="space-y-5 flex-1 overflow-y-auto">
+<!-- Item 1 -->
+<div class="flex gap-4">
+<div class="h-10 w-10 shrink-0 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined !text-lg">check_circle</span>
+</div>
+<div class="min-w-0">
+<p class="text-sm font-bold text-slate-900 dark:text-white truncate">Loja Express Centro</p>
+<p class="text-xs text-slate-500">Inspeção Trimestral • 14:30</p>
+<div class="mt-2 flex items-center gap-2">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20">CONFORME</span>
+<span class="text-[10px] text-slate-400">ID #VT829</span>
+</div>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex gap-4">
+<div class="h-10 w-10 shrink-0 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined !text-lg">warning</span>
+</div>
+<div class="min-w-0">
+<p class="text-sm font-bold text-slate-900 dark:text-white truncate">Condomínio Solar</p>
+<p class="text-xs text-slate-500">Vistoria de Gás • 11:15</p>
+<div class="mt-2 flex items-center gap-2">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-600 dark:bg-amber-900/20">ATENÇÃO</span>
+<span class="text-[10px] text-slate-400">ID #VT827</span>
+</div>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex gap-4">
+<div class="h-10 w-10 shrink-0 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined !text-lg">dangerous</span>
+</div>
+<div class="min-w-0">
+<p class="text-sm font-bold text-slate-900 dark:text-white truncate">Indústria Metálica SA</p>
+<p class="text-xs text-slate-500">Segurança do Trabalho • 09:00</p>
+<div class="mt-2 flex items-center gap-2">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-600 dark:bg-red-900/20">IRREGULAR</span>
+<span class="text-[10px] text-slate-400">ID #VT821</span>
+</div>
+</div>
+</div>
+<!-- Item 4 -->
+<div class="flex gap-4">
+<div class="h-10 w-10 shrink-0 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined !text-lg">check_circle</span>
+</div>
+<div class="min-w-0">
+<p class="text-sm font-bold text-slate-900 dark:text-white truncate">Mercado Veras</p>
+<p class="text-xs text-slate-500">Higiene Alimentar • Ontem</p>
+<div class="mt-2 flex items-center gap-2">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20">CONFORME</span>
+<span class="text-[10px] text-slate-400">ID #VT815</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Metrics -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 pb-8">
+<div class="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+<p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Média de Tempo</p>
+<p class="text-lg font-bold text-slate-900 dark:text-white mt-1">1h 45m</p>
+</div>
+<div class="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+<p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Itens Auditados</p>
+<p class="text-lg font-bold text-slate-900 dark:text-white mt-1">12,482</p>
+</div>
+<div class="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+<p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Expertise Scoring</p>
+<p class="text-lg font-bold text-slate-900 dark:text-white mt-1">98/100</p>
+</div>
+<div class="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-800">
+<p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">SLA Cumprido</p>
+<p class="text-lg font-bold text-slate-900 dark:text-white mt-1">99.7%</p>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RT-Expert CRM | Clients</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#3f68e4",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#111521",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .filled-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
+<div class="flex h-screen overflow-hidden">
+<!-- Sidebar -->
+<aside class="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col">
+<div class="p-6 flex items-center gap-3">
+<div class="bg-primary text-white p-2 rounded-lg">
+<span class="material-symbols-outlined block">business_center</span>
+</div>
+<h1 class="text-xl font-bold tracking-tight">RT-Expert</h1>
+</div>
+<nav class="flex-1 px-4 space-y-2 mt-4">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-medium text-sm">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-primary/10 text-primary rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined filled-icon">group</span>
+<span class="font-medium text-sm">Clients</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="font-medium text-sm">Contracts</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-medium text-sm">Reports</span>
+</a>
+</nav>
+<div class="p-4 border-t border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3 px-4 py-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">JS</div>
+<div class="flex-1 overflow-hidden">
+<p class="text-sm font-semibold truncate">John Smith</p>
+<p class="text-xs text-slate-500 truncate">Admin Profile</p>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-lg">settings</span>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col overflow-hidden">
+<!-- Top Nav -->
+<header class="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 flex items-center justify-between">
+<div class="flex-1 max-w-xl">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary">search</span>
+<input class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white dark:focus:bg-slate-800 transition-all" placeholder="Search clients, CNPJ, or status..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="bg-primary text-white px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-lg">add</span>
+                        New Client
+                    </button>
+</div>
+</header>
+<!-- Content Area -->
+<section class="flex-1 overflow-y-auto p-8">
+<div class="max-w-6xl mx-auto">
+<div class="flex items-end justify-between mb-8">
+<div>
+<h2 class="text-3xl font-black text-slate-900 dark:text-white">Clients Database</h2>
+<p class="text-slate-500 dark:text-slate-400 mt-1">Manage all registered companies and their contract lifecycle.</p>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors">
+<span class="material-symbols-outlined text-lg">filter_list</span>
+                                Filter
+                            </button>
+<button class="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors">
+<span class="material-symbols-outlined text-lg">file_download</span>
+                                Export
+                            </button>
+</div>
+</div>
+<!-- Table Container -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Company</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">CNPJ</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Documents</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Modern glass skyscraper facade" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDHPkyjQC_Aj3pTUZBc0sdrh_5rzqCFhujwPUu0YRwCtNm3PTKU76VAZhgY6Tz3kBAh56GjQjnMq247GeFOWIT6jhjbrWi_VqFMAj0q_z7Og07HOaSKuEUyltgycPzzD_BRyomvD0ovBLDTjJZuBsovW5iaWEMCX13Lxdo3zM6RV32niJHv8fH7Qb-ijYjIqkJHJBMMYRHXQYjCzVdVWwUjOUWPqQKOeUbskuYVxDZRIk0jwM5teJDiQc8rKyuZ38h_tpQYT1Gy5nc"/>
+</div>
+<div>
+<p class="font-bold text-slate-900 dark:text-white">Global Tech Solutions</p>
+<p class="text-xs text-slate-500">San Francisco, CA</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-400">12.345.678/0001-90</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
+                                            Active
+                                        </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-white dark:border-slate-900 flex items-center justify-center text-slate-400 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">attachment</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-white dark:border-slate-900 flex items-center justify-center text-slate-400 hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Industrial office building exterior" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYByEJ4I2JeSGQWZKBmRC4ya4SVR2USM1rQGG-hhHHiZUpzQPLPQ6bUzSvaINrBN85L9PzPbRPqj7DZGJs9EcjmJ1AWEsoqv7lzH9ElEcXFF8Dd5ZhjskEMm9IQuCFOQM6rh1OnBs8vSD0yHC5MqaqJoLNdkek6avE3XtoaSprWSCVmJ47EUysckyA72A1XEeLc5Eoq2hh7n9XH8c9-jXeRCczgTUyPz0pl2ihfKa9v1mNQX15txR3HRTjyWbkvu0bstxKIGPbHLU"/>
+</div>
+<div>
+<p class="font-bold text-slate-900 dark:text-white">Nexus Logistics</p>
+<p class="text-xs text-slate-500">Chicago, IL</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-400">98.765.432/0001-10</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span>
+                                            Inactive
+                                        </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex">
+<div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-white dark:border-slate-900 flex items-center justify-center text-slate-400">
+<span class="material-symbols-outlined text-sm">block</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="City office building windows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBENzB6T4aZPV1_HhKbOBmjL4HmCxoxxBI4FP3ArBbkOKXIJ6Fxx5KWlkV9r5vz_OCAPPFzNqRl1qACKfzxmD6Skiz9eOuDjdq4E0uK4IHSKon2kb5sAkZ_4aAV_XafbHemTwNGHsEHXSlfuNeKdniyEwZyJFqv6Pj2kzbS-oDKO4eo2SFeoNl96CZ0ppaogZmTgQU-67UbGo-UICmngZAQjrMdBNpt01Z_F_3EXpz66VNLSzpJXhqp4kqmbOLOUqowXMFvFkHp9rQ"/>
+</div>
+<div>
+<p class="font-bold text-slate-900 dark:text-white">Quantum Corp</p>
+<p class="text-xs text-slate-500">New York, NY</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-400">45.678.901/0001-22</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
+                                            Active
+                                        </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-white dark:border-slate-900 flex items-center justify-center text-slate-400 hover:text-primary cursor-pointer">
+<span class="material-symbols-outlined text-sm">description</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Modern architecture facade detail" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgbK7iQnTqcaJgpuPV9S7Lnrk_ipTweD0fa0R89rmHbfpiXl-23_Bv8qMVD0DubjDX3zXeRkw-aMpHO0GMeXeOUCVUtqg3G3dsHX6wZEZ-LU0IWXlmhg07LT5H5nw3muALCu9P84lHaKrPC916zf70FV_qwee7g3SGCDKBrUv-H9IF-CGeEnMNbRJFBftJ-v6wpCdOTZiJrpnrQ9hLtxqWVdOB7Xpd7EwbAkIg5c37dh4Q42yt8_3NYJVRreExzLkxEbJl2YBQs38"/>
+</div>
+<div>
+<p class="font-bold text-slate-900 dark:text-white">Terra Firma Group</p>
+<p class="text-xs text-slate-500">Austin, TX</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-400">33.222.111/0001-55</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>
+                                            Active
+                                        </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-white dark:border-slate-900 flex items-center justify-center text-slate-400 hover:text-primary cursor-pointer">
+<span class="material-symbols-outlined text-sm">folder</span>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<!-- Pagination -->
+<div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+<p class="text-sm text-slate-500 font-medium">Showing 1 to 4 of 24 clients</p>
+<div class="flex gap-2">
+<button class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition-colors disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined text-lg">chevron_left</span>
+</button>
+<button class="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition-colors">
+<span class="material-symbols-outlined text-lg">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Side Panel Overlay (Registration Form) -->
+<!-- Toggle this with state in a real app; shown here for design purposes -->
+<div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-end hidden">
+<div class="w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col">
+<div class="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+<div>
+<h3 class="text-xl font-bold">New Client Registration</h3>
+<p class="text-xs text-slate-500">Fill in the details to add a new company</p>
+</div>
+<button class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-6 space-y-6">
+<div>
+<label class="block text-sm font-semibold mb-2">Company Name</label>
+<input class="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg focus:ring-primary focus:border-primary transition-all" placeholder="e.g. Acme Corp" type="text"/>
+</div>
+<div>
+<label class="block text-sm font-semibold mb-2">CNPJ</label>
+<input class="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg focus:ring-primary focus:border-primary transition-all" placeholder="00.000.000/0000-00" type="text"/>
+</div>
+<div>
+<label class="block text-sm font-semibold mb-2">Address</label>
+<textarea class="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg focus:ring-primary focus:border-primary transition-all" placeholder="Street, Number, Suite, Zip Code" rows="3"></textarea>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="col-span-2">
+<label class="block text-sm font-semibold mb-2">Contact Person</label>
+<input class="w-full bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg focus:ring-primary focus:border-primary transition-all" placeholder="Full Name" type="text"/>
+</div>
+</div>
+<div class="p-4 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-slate-400 gap-2">
+<span class="material-symbols-outlined text-4xl">add_photo_alternate</span>
+<p class="text-xs font-medium">Upload Company Photo</p>
+</div>
+</div>
+<div class="p-6 border-t border-slate-200 dark:border-slate-800 flex gap-3">
+<button class="flex-1 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+<button class="flex-1 py-2.5 rounded-lg bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">Save Client</button>
+</div>
+</div>
+</div>
+</div>
+</body></html>

@@ -15,9 +15,11 @@ import {
   Map,
   Settings as SettingsIcon,
   CheckSquare,
+  Calendar,
   Search,
   Bell,
-  User as UserIcon
+  User as UserIcon,
+  ChevronLeft
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -104,6 +106,7 @@ const Layout = ({ children }: LayoutProps) => {
     { icon: FileCheck, label: "Fazer Inspeção", path: "/aplicar-checklist" },
     { icon: Map, label: "Mapa de Clientes", path: "/mapa-clientes" },
     { icon: CheckSquare, label: "Checklists Prontos", path: "/checklists-prontos" },
+    { icon: Calendar, label: "Visitas", path: "/visitas" },
   ];
 
   const SideNav = ({ isMobile = false }: { isMobile?: boolean }) => (
@@ -266,7 +269,15 @@ const Layout = ({ children }: LayoutProps) => {
 
         {/* Mobile Header */}
         <div className="md:hidden flex h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 items-center justify-between px-4 shrink-0">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {location.pathname !== "/" && (
+              <button 
+                onClick={() => navigate(-1)}
+                className="p-1 px-0 text-slate-500 hover:text-primary transition-colors outline-none"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+            )}
             {logoUrl ? (
               <img src={logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded-lg shadow-sm bg-white" />
             ) : (
@@ -279,7 +290,7 @@ const Layout = ({ children }: LayoutProps) => {
                 </div>
               </div>
             )}
-            <h1 className="font-extrabold text-lg truncate max-w-[150px]">
+            <h1 className="font-extrabold text-lg truncate max-w-[120px]">
               {companyName === "RT-Expert" ? (
                 <span className="flex items-center gap-0.5">
                   RT<span className="text-primary font-light">Expert</span>

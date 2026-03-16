@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, Building2, Image as ImageIcon, User, Mail, ShieldCheck, Save } from "lucide-react";
+import { Upload, Building2, Image as ImageIcon, User, Mail, ShieldCheck, Save, Calendar, CheckCircle2 } from "lucide-react";
 import { compressImage } from "@/lib/image-utils";
+import { useGoogleLogin } from '@react-oauth/google';
 import {
   Avatar,
   AvatarFallback,
@@ -24,6 +25,8 @@ const Settings = () => {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -37,7 +40,7 @@ const Settings = () => {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("company_name, logo_url, nome_rt, email, avatar_url")
+      .select("company_name, logo_url, nome_rt, email, avatar_url, google_access_token")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -54,6 +57,7 @@ const Settings = () => {
       setNomeRT(profileData.nome_rt || "");
       setEmail(profileData.email || "");
       setAvatarUrl(profileData.avatar_url || "");
+      setGoogleConnected(!!profileData.google_access_token);
     }
   };
 
@@ -90,7 +94,7 @@ const Settings = () => {
       }
 
       const fileExt = "jpg"; // We compress to jpeg
-      const fileName = `${userId}/${Math.random()}.${fileExt}`;
+      const fileName = `${userId}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from(bucket)
@@ -99,7 +103,10 @@ const Settings = () => {
           upsert: true
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Supabase Storage Error:', uploadError);
+        throw uploadError;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from(bucket)
@@ -148,6 +155,66 @@ const Settings = () => {
     }
 
     setLoading(false);
+  };
+
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setGoogleLoading(true);
+      try {
+        const { access_token } = tokenResponse;
+        
+        // Em um app de produção, usaríamos o refresh token através de um servidor.
+        // Aqui vamos salvar o access token diretamente para fins de MVP.
+        const { error } = await supabase
+          .from("profiles")
+          .update({
+             // @ts-ignore
+            google_access_token: access_token,
+             // @ts-ignore
+            google_token_expiry: new Date(Date.now() + 3600 * 1000).toISOString()
+          })
+          .eq("id", userId);
+
+        if (error) throw error;
+        
+        setGoogleConnected(true);
+        toast.success("Google Agenda conectado com sucesso!");
+      } catch (error) {
+        console.error("Erro ao salvar token do Google:", error);
+        toast.error("Erro ao conectar com Google Agenda");
+      } finally {
+        setGoogleLoading(false);
+      }
+    },
+    onError: () => {
+      toast.error("Falha na autenticação com o Google");
+    },
+    scope: 'https://www.googleapis.com/auth/calendar.events',
+  });
+
+  const disconnectGoogle = async () => {
+    setGoogleLoading(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          // @ts-ignore
+          google_access_token: null,
+          // @ts-ignore
+          google_refresh_token: null,
+          // @ts-ignore
+          google_token_expiry: null
+        })
+        .eq("id", userId);
+
+      if (error) throw error;
+      setGoogleConnected(false);
+      toast.success("Google Agenda desconectado");
+    } catch (error) {
+      toast.error("Erro ao desconectar");
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -319,6 +386,96 @@ const Settings = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* GOOGLE CALENDAR INTEGRATION */}
+        <Card className="mt-6 border-amber-500/20 shadow-sm overflow-hidden bg-gradient-to-br from-white to-amber-50/30 dark:from-slate-900 dark:to-amber-950/10">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+            <div className="space-y-1">
+              <CardTitle className="text-xl flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-amber-500" />
+                Sincronização com Google Agenda
+              </CardTitle>
+              <CardDescription>
+                Crie automaticamente seus compromissos no Google Calendar
+              </CardDescription>
+            </div>
+            {googleConnected && (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-bold ring-1 ring-green-600/20">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                CONECTADO
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row items-center gap-8">
+              <div className="flex-1 space-y-4">
+                <div className="rounded-lg bg-amber-500/5 p-4 border border-amber-500/10">
+                  <h4 className="text-sm font-bold text-amber-800 dark:text-amber-400 mb-1">Como funciona?</h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                    Sempre que você gerar um agendamento no sistema (manualmente ou via Checklist), 
+                    nós enviaremos instantaneamente para a sua agenda principal do Google. 
+                    Você receberá lembretes no celular e no e-mail conforme configurado no seu Google.
+                  </p>
+                </div>
+                
+                <ul className="space-y-3">
+                  {[
+                    "Sincronização instantânea de novas visitas",
+                    "Acesso offline via aplicativo do Google",
+                    "Compartilhamento fácil com sua equipe"
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                      <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="w-full md:w-auto flex flex-col items-center gap-4 bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-slate-100 mb-2">
+                  <img 
+                    src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg" 
+                    alt="Google Calendar" 
+                    className="w-10 h-10"
+                  />
+                </div>
+                
+                {googleConnected ? (
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-64 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-11"
+                    onClick={disconnectGoogle}
+                    disabled={googleLoading}
+                  >
+                    {googleLoading ? "Desconectando..." : "Desconectar Conta Google"}
+                  </Button>
+                ) : (
+                  <Button 
+                    className="w-full sm:w-64 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-sm h-11 flex items-center justify-center gap-3"
+                    onClick={() => handleGoogleLogin()}
+                    disabled={googleLoading}
+                  >
+                    {googleLoading ? (
+                      "Conectando..."
+                    ) : (
+                      <>
+                        <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" className="w-5 h-5" alt="G" />
+                        Conectar Google Agenda
+                      </>
+                    )}
+                  </Button>
+                )}
+                
+                <p className="text-[10px] text-muted-foreground text-center max-w-[200px]">
+                  {googleConnected 
+                    ? "Sua conta já está sincronizada com nosso sistema."
+                    : "Você será redirecionado para a página de autorização segura do Google."}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );

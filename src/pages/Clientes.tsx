@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Building2, MapPin } from "lucide-react";
+import { Plus, Pencil, Trash2, Building2, MapPin, Info, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface Cliente {
   id: string;
@@ -17,6 +18,7 @@ interface Cliente {
   cnpj: string;
   cep: string | null;
   rua: string | null;
+  numero?: string | null;
   bairro: string | null;
   cidade: string | null;
   estado: string | null;
@@ -31,9 +33,12 @@ interface Cliente {
 const Clientes = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Cliente>>({});
   const [loading, setLoading] = useState(false);
+  const [geocodeConfirmOpen, setGeocodeConfirmOpen] = useState(false);
 
   useEffect(() => {
     fetchClientes();
@@ -77,6 +82,80 @@ const Clientes = () => {
     }
   };
 
+  const fetchCNPJ = async (cnpj: string) => {
+    const cleanCNPJ = cnpj.replace(/\D/g, "");
+    if (cleanCNPJ.length !== 14) return;
+
+    setLoading(true);
+    try {
+      console.log(`Buscando CNPJ: ${cleanCNPJ}`);
+      // Tentando v2 que costuma ser mais completa
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v2/${cleanCNPJ}`);
+      
+      if (!response.ok) {
+        // Se v2 falhar, tenta v1 como fallback
+        const responseV1 = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCNPJ}`);
+        if (!responseV1.ok) {
+          throw new Error("CNPJ não encontrado nas bases de dados da BrasilAPI");
+        }
+        const dataV1 = await responseV1.json();
+        processCNPJData(dataV1);
+        return;
+      }
+
+      const data = await response.json();
+      processCNPJData(data);
+    } catch (error: any) {
+      console.error("Erro ao buscar CNPJ:", error);
+      toast.error(error.message || "Erro ao buscar CNPJ. Verifique sua conexão ou tente novamente mais tarde.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCNPJ = (cnpj: string) => {
+    const cleaned = cnpj.replace(/\D/g, "");
+    return cleaned.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+  };
+
+  const formatCPF = (cpf: string | null) => {
+    if (!cpf) return "";
+    const cleaned = cpf.replace(/\D/g, "");
+    if (cleaned.length <= 3) return cleaned;
+    if (cleaned.length <= 6) return cleaned.replace(/^(\d{3})(\d+)/, "$1.$2");
+    if (cleaned.length <= 9) return cleaned.replace(/^(\d{3})(\d{3})(\d+)/, "$1.$2.$3");
+    return cleaned.replace(/^(\d{3})(\d{3})(\d{3})(\d{1,2}).*/, "$1.$2.$3-$4");
+  };
+
+  const formatTelefone = (tel: string | null) => {
+    if (!tel) return "-";
+    const cleaned = tel.replace(/\D/g, "");
+    if (cleaned.length === 11) {
+      return cleaned.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3");
+    }
+    if (cleaned.length === 10) {
+      return cleaned.replace(/^(\d{2})(\d{4})(\d{4})$/, "($1) $2-$3");
+    }
+    return tel;
+  };
+
+  const processCNPJData = (data: any) => {
+    setFormData((prev) => ({
+      ...prev,
+      razao_social: data.razao_social || prev.razao_social,
+      nome_fantasia: data.nome_fantasia || data.razao_social || prev.nome_fantasia,
+      cep: data.cep || prev.cep,
+      rua: data.logradouro || prev.rua,
+      numero: data.numero || prev.numero,
+      bairro: data.bairro || prev.bairro,
+      cidade: data.municipio || prev.cidade,
+      estado: data.uf || prev.estado,
+      telefone: data.ddd_telefone_1 || prev.telefone,
+      email_cliente: data.email || prev.email_cliente,
+    }));
+    toast.success("Dados da empresa carregados!");
+  };
+
   const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number } | null> => {
     try {
       const response = await fetch(
@@ -117,7 +196,7 @@ const Clientes = () => {
     // Only geocode if coordinates are not provided manually
     if (!latitude || !longitude) {
       if (formData.rua && formData.cidade && formData.estado) {
-        const endereco = `${formData.rua}, ${formData.bairro || ""}, ${formData.cidade}, ${formData.estado}, Brasil`;
+        const endereco = `${formData.rua}${formData.numero ? `, ${formData.numero}` : ""}, ${formData.bairro || ""}, ${formData.cidade}, ${formData.estado}, Brasil`;
         const coords = await geocodeAddress(endereco);
         if (coords) {
           latitude = coords.lat;
@@ -185,7 +264,7 @@ const Clientes = () => {
     let atualizados = 0;
     for (const cliente of clientesSemCoordenadas) {
       if (cliente.rua && cliente.cidade && cliente.estado) {
-        const endereco = `${cliente.rua}, ${cliente.bairro || ""}, ${cliente.cidade}, ${cliente.estado}, Brasil`;
+        const endereco = `${cliente.rua}${cliente.numero ? `, ${cliente.numero}` : ""}, ${cliente.bairro || ""}, ${cliente.cidade}, ${cliente.estado}, Brasil`;
         const coords = await geocodeAddress(endereco);
 
         if (coords) {
@@ -221,6 +300,11 @@ const Clientes = () => {
     setDialogOpen(true);
   };
 
+  const openViewDialog = (cliente: Cliente) => {
+    setSelectedCliente(cliente);
+    setViewDialogOpen(true);
+  };
+
   return (
     <Layout>
       <div className="p-6 md:p-8 space-y-6">
@@ -230,17 +314,59 @@ const Clientes = () => {
             <p className="text-muted-foreground text-sm">Gerencie as empresas cadastradas</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              onClick={handleGeocodeAll}
-              disabled={loading}
-              variant="outline"
-              className="flex-1 sm:flex-none"
-            >
-              <MapPin className="w-4 h-4 mr-2 sm:hidden" />
-              <MapPin className="w-4 h-4 mr-2 hidden sm:block" />
-              <span className="sm:hidden">Coordenadas</span>
-              <span className="hidden sm:inline">{loading ? "Atualizando..." : "Atualizar Coordenadas"}</span>
-            </Button>
+            <Dialog open={geocodeConfirmOpen} onOpenChange={setGeocodeConfirmOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="flex-1 sm:flex-none"
+                  disabled={loading}
+                >
+                  <MapPin className="w-4 h-4 mr-2" />
+                  <span className="sm:hidden">Coordenadas</span>
+                  <span className="hidden sm:inline">{loading ? "Atualizando..." : "Atualizar Coordenadas"}</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-primary" />
+                    Atualizar Coordenadas
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Tentaremos localizar automaticamente as coordenadas de todos os clientes para que eles apareçam no mapa.
+                  </p>
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <Info className="h-4 w-4 text-amber-600" />
+                    <AlertTitle className="text-amber-800">Dica de Precisão</AlertTitle>
+                    <AlertDescription className="text-xs text-amber-700">
+                      Se algum cliente não aparecer corretamente após a busca, você deve:
+                      <ol className="list-decimal ml-4 mt-2 space-y-1">
+                        <li>Ir ao <strong>Google Maps</strong> e copiar as coordenadas do local.</li>
+                        <li>Clicar em <strong>Editar</strong> no cliente desejado.</li>
+                        <li>Colar as coordenadas no campo correspondente.</li>
+                        <li>Salvar e clicar em <strong>Atualizar Coordenadas</strong> novamente.</li>
+                      </ol>
+                    </AlertDescription>
+                  </Alert>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setGeocodeConfirmOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setGeocodeConfirmOpen(false);
+                      handleGeocodeAll();
+                    }}
+                    className="bg-primary text-white"
+                  >
+                    Iniciar Atualização
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => openDialog()} className="bg-primary hover:bg-primary/90 text-white flex-1 sm:flex-none">
@@ -254,8 +380,34 @@ const Clientes = () => {
                   <DialogDescription>Preencha os dados da empresa</DialogDescription>
                 </DialogHeader>
 
+                <Alert className="bg-blue-50 border-blue-200 text-blue-800 mb-4">
+                  <Info className="h-4 w-4 text-blue-600" />
+                  <AlertTitle>Busca Automática</AlertTitle>
+                  <AlertDescription className="text-xs">
+                    Ao digitar os 14 dígitos do CNPJ, tentaremos carregar os dados automaticamente. 
+                    <br />
+                    <strong>Nota:</strong> CNPJs criados recentemente podem levar alguns dias para constar na base pública.
+                  </AlertDescription>
+                </Alert>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="col-span-2">
+                  <div>
+                    <Label htmlFor="cnpj">CNPJ *</Label>
+                    <Input
+                      id="cnpj"
+                      placeholder="00.000.000/0000-00"
+                      value={formData.cnpj ? formData.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5") : ""}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, "").slice(0, 14);
+                        setFormData({ ...formData, cnpj: value });
+                        if (value.length === 14) {
+                          fetchCNPJ(value);
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div>
                     <Label htmlFor="razao_social">Razão Social *</Label>
                     <Input
                       id="razao_social"
@@ -274,23 +426,15 @@ const Clientes = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="cnpj">CNPJ *</Label>
-                    <Input
-                      id="cnpj"
-                      value={formData.cnpj || ""}
-                      onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
                     <Label htmlFor="cep">CEP</Label>
                     <Input
                       id="cep"
-                      value={formData.cep || ""}
+                      placeholder="00000-000"
+                      value={formData.cep ? formData.cep.replace(/^(\d{5})(\d{3})$/, "$1-$2") : ""}
                       onChange={(e) => {
-                        const value = e.target.value;
+                        const value = e.target.value.replace(/\D/g, "").slice(0, 8);
                         setFormData({ ...formData, cep: value });
-                        if (value.replace(/\D/g, "").length === 8) {
+                        if (value.length === 8) {
                           fetchCEP(value);
                         }
                       }}
@@ -303,6 +447,16 @@ const Clientes = () => {
                       id="rua"
                       value={formData.rua || ""}
                       onChange={(e) => setFormData({ ...formData, rua: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="numero">Número</Label>
+                    <Input
+                      id="numero"
+                      value={formData.numero || ""}
+                      onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                      placeholder="Ex: 123 ou S/N"
                     />
                   </div>
 
@@ -365,8 +519,12 @@ const Clientes = () => {
                     <Label htmlFor="cpf_responsavel">CPF Responsável</Label>
                     <Input
                       id="cpf_responsavel"
-                      value={formData.cpf_responsavel || ""}
-                      onChange={(e) => setFormData({ ...formData, cpf_responsavel: e.target.value })}
+                      placeholder="000.000.000-00"
+                      value={formatCPF(formData.cpf_responsavel || "")}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, "").slice(0, 11);
+                        setFormData({ ...formData, cpf_responsavel: value });
+                      }}
                     />
                   </div>
 
@@ -410,6 +568,77 @@ const Clientes = () => {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-primary" />
+                    Detalhes do Cliente
+                  </DialogTitle>
+                  <DialogDescription>Informações completas da empresa</DialogDescription>
+                </DialogHeader>
+
+                {selectedCliente && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground">Razão Social</Label>
+                      <p className="font-semibold text-lg">{selectedCliente.razao_social}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground">CNPJ</Label>
+                      <p className="font-medium">{formatCNPJ(selectedCliente.cnpj)}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground">Nome Fantasia</Label>
+                      <p className="font-medium">{selectedCliente.nome_fantasia || "-"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground">Telefone</Label>
+                      <p className="font-medium">{formatTelefone(selectedCliente.telefone)}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground">Email</Label>
+                      <p className="font-medium">{selectedCliente.email_cliente || "-"}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground">CEP</Label>
+                      <p className="font-medium">{selectedCliente.cep ? selectedCliente.cep.replace(/^(\d{5})(\d{3})$/, "$1-$2") : "-"}</p>
+                    </div>
+                    <div className="col-span-2 space-y-1 border-t pt-4">
+                      <Label className="text-muted-foreground flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> Endereço
+                      </Label>
+                      <p className="font-medium">
+                        {selectedCliente.rua}{selectedCliente.numero ? `, ${selectedCliente.numero}` : ""}, {selectedCliente.bairro}
+                        <br />
+                        {selectedCliente.cidade} - {selectedCliente.estado}
+                      </p>
+                    </div>
+                    <div className="space-y-1 border-t pt-4">
+                      <Label className="text-muted-foreground">Responsável Legal</Label>
+                      <p className="font-medium">{selectedCliente.responsavel_legal || "-"}</p>
+                    </div>
+                    <div className="space-y-1 border-t pt-4">
+                      <Label className="text-muted-foreground">CPF Responsável</Label>
+                      <p className="font-medium">
+                        {selectedCliente.cpf_responsavel ? selectedCliente.cpf_responsavel.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4") : "-"}
+                      </p>
+                    </div>
+                    {selectedCliente.latitude && selectedCliente.longitude && (
+                      <div className="col-span-2 space-y-1 border-t pt-4">
+                        <Label className="text-muted-foreground">Coordenadas Geográficas</Label>
+                        <p className="text-sm font-mono">{selectedCliente.latitude}, {selectedCliente.longitude}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <DialogFooter>
+                  <Button onClick={() => setViewDialogOpen(false)}>Fechar</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -426,32 +655,50 @@ const Clientes = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Razão Social</TableHead>
-                    <TableHead>CNPJ</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <TableHead className="px-2 sm:px-4">Nome / Razão Social</TableHead>
+                    <TableHead className="px-2 sm:px-4">CNPJ</TableHead>
+                    <TableHead className="hidden md:table-cell">Telefone</TableHead>
+                    <TableHead className="text-right px-2 sm:px-4">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {clientes.map((cliente) => (
                     <TableRow key={cliente.id}>
-                      <TableCell className="font-medium">{cliente.razao_social}</TableCell>
-                      <TableCell>{cliente.cnpj}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openDialog(cliente)}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(cliente.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                      <TableCell className="font-medium px-2 sm:px-4 max-w-[120px] sm:max-w-none truncate text-xs sm:text-sm">
+                        {cliente.nome_fantasia || cliente.razao_social}
+                      </TableCell>
+                      <TableCell className="px-2 sm:px-4 text-[10px] sm:text-sm whitespace-nowrap">
+                        {formatCNPJ(cliente.cnpj)}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">{formatTelefone(cliente.telefone)}</TableCell>
+                      <TableCell className="text-right px-2 sm:px-4 whitespace-nowrap">
+                        <div className="flex justify-end gap-1 sm:gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 sm:h-9 sm:w-9"
+                            onClick={() => openViewDialog(cliente)}
+                            title="Visualizar Detalhes"
+                          >
+                            <Eye className="w-4 h-4 text-blue-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 sm:h-9 sm:w-9"
+                            onClick={() => openDialog(cliente)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 sm:h-9 sm:w-9 text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(cliente.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { syncToGoogleCalendar } from "@/lib/google-calendar";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -103,6 +104,10 @@ const AplicarChecklist = () => {
     if (!error && data) {
       setModelos(data as unknown as Modelo[]);
     }
+  };
+
+  const formatCNPJ = (cnpj: string) => {
+    return cnpj.replace(/\D/g, "").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
   };
 
   const handleResposta = (itemId: string, valor: any) => {
@@ -235,17 +240,17 @@ const AplicarChecklist = () => {
     pdf.setTextColor(100, 100, 100);
     pdf.text(modeloAtual.nome_modelo, pageWidth / 2, yPos, { align: "center" });
     pdf.setTextColor(0, 0, 0);
-    yPos += 10;
+    yPos += 8;
 
     pdf.setDrawColor(200, 200, 200);
     pdf.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 10;
+    yPos += 6;
 
     pdf.setFillColor(245, 245, 245);
-    const boxHeight = clienteAtual.responsavel_legal ? 28 : 22;
+    const boxHeight = clienteAtual.responsavel_legal ? 24 : 18;
     pdf.rect(margin, yPos, contentWidth, boxHeight, "F");
 
-    yPos += 6;
+    yPos += 5;
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.text("Razão Social:", margin + 3, yPos);
@@ -274,10 +279,10 @@ const AplicarChecklist = () => {
       pdf.text("Responsável Legal:", margin + 3, yPos);
       pdf.setFont("helvetica", "normal");
       pdf.text(clienteAtual.responsavel_legal, margin + 48, yPos);
-      yPos += 5;
+      yPos += 4;
     }
 
-    yPos += 8;
+    yPos += 6;
 
     const secoes = modeloAtual.estrutura_json?.secoes ||
       (modeloAtual.estrutura_json?.campos ? [{ id: 'default', titulo: '', campos: modeloAtual.estrutura_json.campos }] : []);
@@ -424,35 +429,37 @@ const AplicarChecklist = () => {
       pdf.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 10;
 
-      const imgWidth = (contentWidth - 10) / 2;
+      const cols = 4;
+      const spacing = 4;
+      const imgWidth = (contentWidth - (spacing * (cols - 1))) / cols;
       const imgHeight = imgWidth * 0.75;
 
-      for (let i = 0; i < allPhotos.length; i += 2) {
-        if (yPos + imgHeight + 20 > pageHeight) {
+      for (let i = 0; i < allPhotos.length; i += cols) {
+        if (yPos + imgHeight + 15 > pageHeight - 30) {
           pdf.addPage();
           yPos = margin;
         }
 
-        for (let j = 0; j < 2 && (i + j) < allPhotos.length; j++) {
+        for (let j = 0; j < cols && (i + j) < allPhotos.length; j++) {
           const photo = allPhotos[i + j];
-          const xPos = margin + (j * (imgWidth + 10));
+          const xPos = margin + (j * (imgWidth + spacing));
 
           try {
             pdf.addImage(photo.url, "JPEG", xPos, yPos, imgWidth, imgHeight);
-            pdf.setFontSize(7);
+            pdf.setFontSize(6);
             pdf.setFont("helvetica", "italic");
-            const photoLabelLines = pdf.splitTextToSize(`Foto ${i + j + 1}: ${photo.label}`, imgWidth);
-            pdf.text(photoLabelLines, xPos, yPos + imgHeight + 4);
+            pdf.text(`${i + j + 1}`, xPos + (imgWidth / 2), yPos + imgHeight + 3, { align: "center" });
           } catch (e) {
             console.error("Error adding photo to PDF:", e);
           }
         }
-        yPos += imgHeight + 15;
+        yPos += imgHeight + 8;
       }
+      yPos += 5;
     }
 
     if (parecerConclusivo) {
-      if (yPos > pageHeight - 50) {
+      if (yPos > pageHeight - 30) {
         pdf.addPage();
         yPos = margin;
       }
@@ -479,51 +486,59 @@ const AplicarChecklist = () => {
       pdf.setFont("helvetica", "bold");
       pdf.text("Responsável pela Inspeção:", margin, yPos);
       pdf.setFont("helvetica", "normal");
-      pdf.text(nomeRT, margin + 60, yPos);
-      yPos += 15;
+      pdf.text(nomeRT, margin + 48, yPos);
+      yPos += 12;
     }
 
     if (assinaturaRT || assinaturaCliente || assinaturaTestemunha) {
-      if (yPos > pageHeight - 80) {
+      if (yPos > pageHeight - 65) {
         pdf.addPage();
+        yPos = margin + 10;
+      } else {
+        yPos += 12;
       }
-      yPos = pageHeight - 35;
 
       const signatureWidth = 50;
-      const signatureHeight = 20;
+      const signatureHeight = 18;
       const spacing = (contentWidth - (signatureWidth * 3)) / 2;
 
       let xPos = margin;
 
       if (assinaturaRT) {
-        pdf.addImage(assinaturaRT, "PNG", xPos, yPos - signatureHeight, signatureWidth, signatureHeight);
+        pdf.addImage(assinaturaRT, "PNG", xPos, yPos, signatureWidth, signatureHeight);
       }
-      pdf.line(xPos, yPos + 2, xPos + signatureWidth, yPos + 2);
+      pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
       pdf.setFontSize(8);
       pdf.setFont("helvetica", "bold");
-      pdf.text(nomeRT, xPos + signatureWidth / 2, yPos + 7, { align: "center" });
+      pdf.text(nomeRT, xPos + signatureWidth / 2, yPos + signatureHeight + 6, { align: "center" });
       pdf.setFont("helvetica", "normal");
-      pdf.text("Responsável Técnico", xPos + signatureWidth / 2, yPos + 11, { align: "center" });
+      pdf.text("Responsável Técnico", xPos + signatureWidth / 2, yPos + signatureHeight + 10, { align: "center" });
+      
       xPos += signatureWidth + spacing;
 
       if (assinaturaCliente) {
-        pdf.addImage(assinaturaCliente, "PNG", xPos, yPos - signatureHeight, signatureWidth, signatureHeight);
+        pdf.addImage(assinaturaCliente, "PNG", xPos, yPos, signatureWidth, signatureHeight);
       }
-      pdf.line(xPos, yPos + 2, xPos + signatureWidth, yPos + 2);
+      pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
       pdf.setFont("helvetica", "bold");
-      pdf.text(nomeClienteAssinatura || "Dono/Gerente", xPos + signatureWidth / 2, yPos + 7, { align: "center" });
+      pdf.text(nomeClienteAssinatura || "Dono/Gerente", xPos + signatureWidth / 2, yPos + signatureHeight + 6, { align: "center" });
       pdf.setFont("helvetica", "normal");
-      pdf.text("Dono do Estabelecimento", xPos + signatureWidth / 2, yPos + 11, { align: "center" });
+      pdf.text("Dono do Estabelecimento", xPos + signatureWidth / 2, yPos + signatureHeight + 10, { align: "center" });
+      
       xPos += signatureWidth + spacing;
 
-      if (assinaturaTestemunha) {
-        pdf.addImage(assinaturaTestemunha, "PNG", xPos, yPos - signatureHeight, signatureWidth, signatureHeight);
+      if (assinaturaTestemunha || nomeTestemunhaAssinatura) {
+        if (assinaturaTestemunha) {
+          pdf.addImage(assinaturaTestemunha, "PNG", xPos, yPos, signatureWidth, signatureHeight);
+        }
+        pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(nomeTestemunhaAssinatura || "", xPos + signatureWidth / 2, yPos + signatureHeight + 6, { align: "center" });
+        pdf.setFont("helvetica", "normal");
+        pdf.text("Testemunha", xPos + signatureWidth / 2, yPos + signatureHeight + 10, { align: "center" });
       }
-      pdf.line(xPos, yPos + 2, xPos + signatureWidth, yPos + 2);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(nomeTestemunhaAssinatura || "", xPos + signatureWidth / 2, yPos + 7, { align: "center" });
-      pdf.setFont("helvetica", "normal");
-      pdf.text("Testemunha", xPos + signatureWidth / 2, yPos + 11, { align: "center" });
+      
+      yPos += signatureHeight + 15;
     }
 
     const pageCount = (pdf as any).internal.getNumberOfPages();
@@ -596,6 +611,43 @@ const AplicarChecklist = () => {
     if (error) {
       toast.error(error.message);
     } else {
+      // Automação: Criar agendamento se houver data de próxima inspeção
+      if (dataProximaInspecao) {
+        try {
+          // Precisamos pegar o ID do checklist que acabou de ser inserido
+          // Como o insert não retornou data (padrão do postgrest as vezes), 
+          // em uma aplicação real faríamos select("*") no insert ou uma busca logo após.
+          // Para garantir o fluxo, vamos inserir o agendamento sem o checklist_origem_id
+          // se não o tivermos agora, ou forçar o retorno.
+          // @ts-ignore
+          const { error: agendamentoError } = await (supabase as any)
+            .from("agendamentos")
+            .insert([{
+              tenant_id: user.id,
+              cliente_id: clienteSelecionado,
+              data_visita: new Date(dataProximaInspecao).toISOString(),
+              descricao: `Visita agendada via checklist: ${modeloAtual?.nome_modelo || ""}`,
+              status: 'pendente'
+            }]);
+          
+          if (agendamentoError) {
+            console.error("Erro ao criar agendamento automático:", agendamentoError);
+          } else {
+            // Sincronizar com Google se possível
+            const cliente = clientes.find(c => c.id === clienteSelecionado);
+            syncToGoogleCalendar({
+              tenant_id: user.id,
+              cliente_nome: cliente?.nome_fantasia || cliente?.razao_social || 'Cliente',
+              data_visita: new Date(dataProximaInspecao).toISOString(),
+              descricao: `Visita agendada via checklist: ${modeloAtual?.nome_modelo || ""}`
+            });
+            toast.success("Visita agendada automaticamente na agenda!");
+          }
+        } catch (e) {
+          console.error("Erro na automação de agenda:", e);
+        }
+      }
+
       toast.success("Checklist aplicado com sucesso!");
       setRespostas({});
       setClienteSelecionado("");
@@ -699,7 +751,7 @@ const AplicarChecklist = () => {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div><span className="font-semibold">Razão Social:</span> {clienteAtual.razao_social}</div>
-                <div><span className="font-semibold">CNPJ:</span> {clienteAtual.cnpj}</div>
+                <div><span className="font-semibold">CNPJ:</span> {formatCNPJ(clienteAtual.cnpj)}</div>
                 <div><span className="font-semibold">Endereço:</span> {[clienteAtual.rua, clienteAtual.bairro, clienteAtual.cidade, clienteAtual.estado].filter(Boolean).join(", ") || "Não informado"}</div>
                 <div><span className="font-semibold">Responsável Legal:</span> {clienteAtual.responsavel_legal || "Não informado"}</div>
               </div>
@@ -859,8 +911,13 @@ const AplicarChecklist = () => {
                                       <td className="p-3">{campo.label}</td>
                                       <td className="p-3">
                                         {campo.tipo === "foto" ? (
-                                          <div className="flex gap-1 flex-wrap">
-                                            {resp?.map((u, i) => <img key={i} src={u} className="w-10 h-10 object-cover rounded" />)}
+                                          <div className="grid grid-cols-4 gap-1 w-full max-w-[200px]">
+                                            {resp?.map((u, i) => (
+                                              <div key={i} className="relative aspect-square">
+                                                <img src={u} className="w-full h-full object-cover rounded border" />
+                                                <span className="absolute bottom-0 right-0 bg-black/60 text-[8px] text-white px-0.5 rounded-tl">{i + 1}</span>
+                                              </div>
+                                            ))}
                                           </div>
                                         ) : (
                                           Array.isArray(resp) ? resp.join(", ") : (resp || "---")
@@ -894,7 +951,10 @@ const AplicarChecklist = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t">
-                          <SignatureCanvas label="Assinatura RT" onSave={setAssinaturaRT} signatureData={assinaturaRT} />
+                          <div className="space-y-2">
+                            <SignatureCanvas label="Assinatura Responsável Técnico" onSave={setAssinaturaRT} signatureData={assinaturaRT} />
+                            <Input value={nomeRT} disabled className="bg-slate-50" />
+                          </div>
                           <div className="space-y-2">
                             <SignatureCanvas label="Assinatura Cliente" onSave={setAssinaturaCliente} signatureData={assinaturaCliente} />
                             <Input placeholder="Nome do Cliente" value={nomeClienteAssinatura} onChange={e => setNomeClienteAssinatura(e.target.value)} />

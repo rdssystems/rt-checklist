@@ -10,6 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import jsPDF from "jspdf";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 interface ChecklistPronto {
   id: string;
@@ -44,11 +48,14 @@ interface ChecklistPronto {
 const ChecklistsProntos = () => {
   const [checklists, setChecklists] = useState<ChecklistPronto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<"all" | "checklist" | "empresa">("all");
   const [viewingChecklist, setViewingChecklist] = useState<ChecklistPronto | null>(null);
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [companyName, setCompanyName] = useState<string>("");
+  const [modelos, setModelos] = useState<{ id: string, nome_modelo: string }[]>([]);
+  const [empresas, setEmpresas] = useState<{ id: string, razao_social: string }[]>([]);
+  const [selectedFilterId, setSelectedFilterId] = useState<string | null>(null);
+  const [comboboxOpen, setComboboxOpen] = useState(false);
 
   useEffect(() => {
     loadChecklists();
@@ -88,6 +95,13 @@ const ChecklistsProntos = () => {
     }
 
     setLoading(false);
+
+    // Fetch models and companies for filters
+    const { data: modelsData } = await supabase.from("modelos_checklist").select("id, nome_modelo").eq("tenant_id", user.id);
+    setModelos(modelsData || []);
+
+    const { data: companiesData } = await supabase.from("clientes").select("id, razao_social").eq("tenant_id", user.id);
+    setEmpresas(companiesData || []);
   };
 
   const handleDelete = async (id: string) => {
@@ -107,20 +121,15 @@ const ChecklistsProntos = () => {
   };
 
   const filteredChecklists = checklists.filter((checklist) => {
-    if (!searchTerm) return true;
-
-    const searchLower = searchTerm.toLowerCase();
-
-    if (filterType === "checklist") {
-      return checklist.modelos_checklist.nome_modelo.toLowerCase().includes(searchLower);
-    } else if (filterType === "empresa") {
-      return checklist.clientes.razao_social.toLowerCase().includes(searchLower);
-    } else {
-      return (
-        checklist.modelos_checklist.nome_modelo.toLowerCase().includes(searchLower) ||
-        checklist.clientes.razao_social.toLowerCase().includes(searchLower)
-      );
+    // Filtro por ID selecionado no Combobox (se houver)
+    if (selectedFilterId) {
+      if (filterType === "checklist") {
+        return checklist.modelo_id === selectedFilterId;
+      } else if (filterType === "empresa") {
+        return checklist.cliente_id === selectedFilterId;
+      }
     }
+    return true;
   });
 
   const generatePDF = async (checklist: ChecklistPronto) => {
@@ -331,7 +340,9 @@ const ChecklistsProntos = () => {
           const outrosText = respostas[`${campo.id}_outros_text`];
           let respostaText = "---";
 
-          if (Array.isArray(resposta)) {
+          if (campo.tipo === "foto" && Array.isArray(resposta) && resposta.length > 0) {
+            respostaText = `${resposta.length} foto(s) anexada(s)`;
+          } else if (Array.isArray(resposta)) {
             respostaText = resposta.join(", ");
             if (outrosText) {
               respostaText += ` (${outrosText})`;
@@ -370,12 +381,71 @@ const ChecklistsProntos = () => {
           pdf.text(perguntaLines, margin + 14, yPos + 3);
 
           // Fill answer
-          pdf.text(respostaLines, margin + 114, yPos + 3);
+          if (campo.tipo === "foto" && Array.isArray(resposta) && resposta.length > 0) {
+            pdf.setTextColor(0, 100, 0);
+            pdf.setFont("helvetica", "bold");
+            pdf.text(respostaText, margin + 114, yPos + 3);
+            pdf.setTextColor(0, 0, 0);
+            pdf.setFont("helvetica", "normal");
+          } else {
+            pdf.text(respostaLines, margin + 114, yPos + 3);
+          }
 
           yPos += rowHeight;
           itemNumber++;
         }
       });
+
+      // ADD PHOTOGRAPHIC APPENDIX HERE
+      const allPhotos: { url: string, label: string }[] = [];
+      campos.forEach((campo: any) => {
+        if (campo.tipo === "foto" && Array.isArray(respostas[campo.id])) {
+          respostas[campo.id].forEach((url: string) => {
+            allPhotos.push({ url, label: campo.label });
+          });
+        }
+      });
+
+      if (allPhotos.length > 0) {
+        pdf.addPage();
+        yPos = margin;
+        pdf.setFontSize(16);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Arquivo Fotográfico", pageWidth / 2, yPos, { align: "center" });
+        yPos += 10;
+        pdf.setDrawColor(200, 200, 200);
+        pdf.line(margin, yPos, pageWidth - margin, yPos);
+        yPos += 10;
+
+        const cols = 4;
+        const spacing = 4;
+        const imgWidth = (contentWidth - (spacing * (cols - 1))) / cols;
+        const imgHeight = imgWidth * 0.75;
+
+        for (let i = 0; i < allPhotos.length; i += cols) {
+          if (yPos + imgHeight + 15 > pageHeight - 30) {
+            pdf.addPage();
+            yPos = margin;
+          }
+
+          for (let j = 0; j < cols && (i + j) < allPhotos.length; j++) {
+            const photo = allPhotos[i + j];
+            const xPos = margin + (j * (imgWidth + spacing));
+
+            try {
+              pdf.addImage(photo.url, "JPEG", xPos, yPos, imgWidth, imgHeight);
+              pdf.setFontSize(6);
+              pdf.setFont("helvetica", "italic");
+              const photoLabelLines = pdf.splitTextToSize(`${i + j + 1}`, imgWidth);
+              pdf.text(photoLabelLines, xPos + (imgWidth / 2), yPos + imgHeight + 3, { align: "center" });
+            } catch (e) {
+              console.error("Error adding photo to PDF:", e);
+            }
+          }
+          yPos += imgHeight + 8;
+        }
+        yPos += 5;
+      }
 
       // Conclusive opinion
       if (checklist.parecer_conclusivo) {
@@ -530,46 +600,99 @@ const ChecklistsProntos = () => {
         <div className="mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <FileCheck className="w-8 h-8" />
-            Checklists Prontos
+            Visitas Concluídas
           </h1>
           <p className="text-muted-foreground mt-2">
             Visualize e baixe os checklists já aplicados
           </p>
         </div>
 
-        <div className="mb-6 flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar checklists..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex gap-2">
+        <div className="mb-6 space-y-4">
+          <div className="grid grid-cols-3 gap-2">
             <Button
               variant={filterType === "all" ? "default" : "outline"}
-              onClick={() => setFilterType("all")}
+              onClick={() => {
+                setFilterType("all");
+                setSelectedFilterId(null);
+              }}
               size="sm"
+              className="text-[10px] h-8 px-1"
             >
               Todos
             </Button>
             <Button
               variant={filterType === "checklist" ? "default" : "outline"}
-              onClick={() => setFilterType("checklist")}
+              onClick={() => {
+                setFilterType("checklist");
+                setSelectedFilterId(null);
+              }}
               size="sm"
+              className="text-[10px] h-8 px-1"
             >
-              Por Checklist
+              Checklist
             </Button>
             <Button
               variant={filterType === "empresa" ? "default" : "outline"}
-              onClick={() => setFilterType("empresa")}
+              onClick={() => {
+                setFilterType("empresa");
+                setSelectedFilterId(null);
+              }}
               size="sm"
+              className="text-[10px] h-8 px-1"
             >
-              Por Empresa
+              Empresa
             </Button>
           </div>
+
+          {filterType !== "all" && (
+            <div className="w-full">
+              <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={comboboxOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedFilterId
+                      ? (filterType === "checklist" 
+                          ? modelos.find((m) => m.id === selectedFilterId)?.nome_modelo 
+                          : empresas.find((e) => e.id === selectedFilterId)?.razao_social)
+                      : `Selecionar ${filterType === "checklist" ? "checklist" : "empresa"}...`}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0 PopoverContent">
+                  <Command>
+                    <CommandInput placeholder={`Pesquisar ${filterType}...`} />
+                    <CommandList>
+                      <CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {(filterType === "checklist" ? modelos : empresas).map((item) => (
+                          <CommandItem
+                            key={item.id}
+                            value={filterType === "checklist" ? (item as any).nome_modelo : (item as any).razao_social}
+                            onSelect={() => {
+                              setSelectedFilterId(item.id);
+                              setComboboxOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedFilterId === item.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {filterType === "checklist" ? (item as any).nome_modelo : (item as any).razao_social}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
         </div>
 
         {filteredChecklists.length === 0 ? (
@@ -587,43 +710,64 @@ const ChecklistsProntos = () => {
         ) : (
           <div className="grid gap-4">
             {filteredChecklists.map((checklist) => (
-              <Card key={checklist.id}>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>{checklist.modelos_checklist.nome_modelo}</span>
-                    <div className="flex gap-2">
-                      <Button onClick={() => setViewingChecklist(checklist)} size="sm" variant="outline">
-                        <Eye className="w-4 h-4 mr-2" />
-                        Visualizar
-                      </Button>
-                      <Button onClick={() => generatePDF(checklist)} size="sm" variant="default">
-                        <Download className="w-4 h-4 mr-2" />
-                        Baixar PDF
-                      </Button>
-                      <Button
-                        onClick={() => handleDelete(checklist.id)}
-                        size="sm"
-                        variant="destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+              <Card key={checklist.id} className="overflow-hidden">
+                <CardHeader className="space-y-4">
+                  <CardTitle className="text-xl leading-tight text-primary">
+                    {checklist.modelos_checklist.nome_modelo}
                   </CardTitle>
-                  <CardDescription className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="w-4 h-4" />
-                      <span>{checklist.clientes.razao_social}</span>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <Button 
+                      onClick={() => setViewingChecklist(checklist)} 
+                      size="sm" 
+                      variant="outline" 
+                      className="w-full justify-center h-10"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      <span className="hidden xs:inline">Visualizar</span>
+                      <span className="xs:hidden">Ver</span>
+                    </Button>
+                    <Button 
+                      onClick={() => generatePDF(checklist)} 
+                      size="sm" 
+                      variant="secondary" 
+                      className="w-full justify-center h-10 bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      PDF
+                    </Button>
+                    <Button
+                      onClick={() => handleDelete(checklist.id)}
+                      size="sm"
+                      variant="ghost"
+                      className="w-full justify-center h-10 text-destructive hover:bg-destructive/10 col-span-2 sm:col-span-1"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Excluir
+                    </Button>
+                  </div>
+
+                  <CardDescription className="space-y-2 pt-4 border-t border-dashed">
+                    <div className="flex items-center gap-2 group">
+                      <div className="p-1.5 rounded-full bg-slate-50 text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                        <Building2 className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="font-medium text-slate-700">{checklist.clientes.razao_social}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>
+                    <div className="flex items-center gap-2 group">
+                      <div className="p-1.5 rounded-full bg-slate-50 text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                        <Calendar className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-slate-600">
                         {format(new Date(checklist.data_aplicacao), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
                       </span>
                     </div>
                     {checklist.responsavel_inspecao && (
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4" />
-                        <span>{checklist.responsavel_inspecao}</span>
+                      <div className="flex items-center gap-2 group">
+                        <div className="p-1.5 rounded-full bg-slate-50 text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                          <User className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-slate-600 italic">Aplicado por: {checklist.responsavel_inspecao}</span>
                       </div>
                     )}
                   </CardDescription>
@@ -719,24 +863,36 @@ const ChecklistsProntos = () => {
 
                                 const resposta = viewingChecklist.respostas_json?.[campo.id];
                                 const outrosText = viewingChecklist.respostas_json?.[`${campo.id}_outros_text`];
-                                let respostaText = "---";
+                                let respostaText: React.ReactNode = "---";
 
-                                if (Array.isArray(resposta) && resposta.length > 0) {
-                                  respostaText = resposta.join(", ");
-                                  if (outrosText && respostaText.includes("Outros")) {
-                                    respostaText = respostaText.replace("Outros", `Outros (${outrosText})`);
+                                if (campo.tipo === "foto" && Array.isArray(resposta) && resposta.length > 0) {
+                                  respostaText = (
+                                    <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 gap-2 mt-1">
+                                      {resposta.map((url, idx) => (
+                                        <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="relative group">
+                                          <img src={url} alt={`Evidência ${idx + 1}`} className="aspect-square w-full object-cover rounded border shadow-sm group-hover:opacity-80 transition-opacity" />
+                                          <span className="absolute bottom-0 right-0 bg-black/60 text-[8px] text-white px-1 rounded-tl">{idx + 1}</span>
+                                        </a>
+                                      ))}
+                                    </div>
+                                  );
+                                } else if (Array.isArray(resposta) && resposta.length > 0) {
+                                  let resText = resposta.join(", ");
+                                  if (outrosText && resText.includes("Outros")) {
+                                    resText = resText.replace("Outros", `Outros (${outrosText})`);
                                   } else if (outrosText) {
-                                    respostaText += ` (${outrosText})`;
+                                    resText += ` (${outrosText})`;
                                   }
+                                  respostaText = resText;
                                 } else if (resposta !== undefined && resposta !== null && resposta !== "") {
                                   respostaText = String(resposta);
                                 }
 
                                 return (
                                   <tr key={campo.id} className="border-t">
-                                    <td className="p-2 text-center font-semibold">{itemIndex++}</td>
-                                    <td className="p-2">{campo.label}</td>
-                                    <td className="p-2">{respostaText}</td>
+                                    <td className="p-2 text-center font-semibold align-top">{itemIndex++}</td>
+                                    <td className="p-2 align-top">{campo.label}</td>
+                                    <td className="p-2 align-top">{respostaText}</td>
                                   </tr>
                                 );
                               })

@@ -382,8 +382,8 @@ const ChecklistDesigner = () => {
                 <div
                   key={secao.id}
                   className={`relative p-6 rounded-xl transition-all duration-200 ${activeSecaoId === secao.id
-                      ? "bg-white/90 dark:bg-slate-900/90 border-2 border-primary shadow-md"
-                      : "bg-white/50 dark:bg-slate-900/50 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-slate-300 cursor-pointer"
+                    ? "bg-white/90 dark:bg-slate-900/90 border-2 border-primary shadow-md"
+                    : "bg-white/50 dark:bg-slate-900/50 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-slate-300 cursor-pointer"
                     }`}
                   onClick={() => setActiveSecaoId(secao.id)}
                 >
@@ -509,8 +509,33 @@ const ChecklistDesigner = () => {
             </div>
 
             {!activeField && (
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg text-center text-sm text-slate-500">
-                Selecione um campo no formulário para editar suas propriedades aqui.
+              <div className="p-6 space-y-6">
+                <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 flex items-center gap-3">
+                  <Settings className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="text-slate-900 dark:text-white text-xs font-bold uppercase">Configurações Gerais</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-[10px]">Propriedades do Modelo</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Nome do Formulário</label>
+                  <input
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-800 text-sm focus:border-primary focus:ring-primary outline-none p-3"
+                    value={nomeModelo}
+                    onChange={(e) => setNomeModelo(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Descrição (Opcional)</label>
+                  <textarea
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-800 text-sm focus:border-primary focus:ring-primary outline-none p-3"
+                    rows={3}
+                    value={descricaoModelo}
+                    onChange={(e) => setDescricaoModelo(e.target.value)}
+                  />
+                </div>
               </div>
             )}
 
