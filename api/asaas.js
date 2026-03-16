@@ -45,6 +45,7 @@ export default async function handler(req, res) {
 
     // 2. Criar a cobrança ou assinatura
     let paymentData;
+    const today = new Date().toISOString().split('T')[0];
     
     if (type === 'RECURRING') {
       // Criar Assinatura (Recorrente) - R$ 80,00
@@ -56,9 +57,9 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           customer: customerId,
-          billingType: 'CREDIT_CARD',
+          billingType: 'UNDEFINED', // Deixa entrar no checkout e escolher/cadastrar cartão
           value: 80,
-          nextDueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Amanhã
+          nextDueDate: today, // Primeiro pagamento hoje
           cycle: 'MONTHLY',
           description: 'Plano RT Expert - Assinatura Mensal Recorrente',
           externalReference: userId
@@ -75,9 +76,9 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           customer: customerId,
-          billingType: 'UNDEFINED', // Deixa o usuário escolher no checkout (PIX, Boleto, Cartão)
+          billingType: 'UNDEFINED',
           value: 99.9,
-          dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0], // 3 dias pra pagar
+          dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
           description: 'Plano RT Expert - Acesso 30 Dias (Avulso)',
           externalReference: userId
         })
@@ -89,14 +90,29 @@ export default async function handler(req, res) {
       throw new Error(paymentData.errors[0].description);
     }
 
-    // Retornar a URL de checkout
-    // Para assinaturas o campo é invoiceUrl ou similar dependendo da versão, 
-    // mas comumente usamos o link interno de pagamento da primeira parcela ou o link geral.
-    // No V3 do Asaas para assinaturas ele gera uma fatura inicial.
+    // Para assinaturas o link pode estar em 'invoiceUrl' ou 'invoiceCustomizationUrl'
+    const checkoutUrl = paymentData.invoiceUrl || 
+                        paymentData.bankSlipUrl || 
+                        paymentData.checkoutUrl || 
+                        paymentData.invoiceCustomizationUrl;
     
-    res.status(200).json({ 
-      url: paymentData.invoiceUrl || paymentData.bankSlipUrl || paymentData.checkoutUrl || paymentData.invoiceCustomizationUrl
-    });
+    if (!checkoutUrl && type === 'RECURRING') {
+      // Caso o Asaas não retorne o link direto na assinatura, tentamos buscar a primeira cobrança dela
+      const paymentsResponse = await fetch(`${ASAAS_URL}/payments?subscription=${paymentData.id}`, {
+        headers: { 'access_token': ASAAS_API_KEY }
+      });
+      const payments = await paymentsResponse.json();
+      if (payments.data && payments.data.length > 0) {
+        return res.status(200).json({ url: payments.data[0].invoiceUrl });
+      }
+    }
+
+    if (!checkoutUrl) {
+      console.error('Objeto recebido do Asaas:', JSON.stringify(paymentData));
+      throw new Error("Não foi possível gerar a URL de pagamento. Tente novamente.");
+    }
+
+    res.status(200).json({ url: checkoutUrl });
 
   } catch (error) {
     console.error('Erro Asaas:', error);
