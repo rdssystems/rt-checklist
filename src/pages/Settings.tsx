@@ -176,7 +176,11 @@ const Settings = () => {
         const response = await fetch('/api/google-auth', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, userId }),
+          body: JSON.stringify({ 
+            code, 
+            userId,
+            redirectUri: window.location.origin 
+          }),
         });
 
         const result = await response.json();

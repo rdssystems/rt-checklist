@@ -161,14 +161,8 @@ const Layout = ({ children }: LayoutProps) => {
           {logoUrl ? (
             <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 bg-white" />
           ) : (
-            <div className="relative flex items-center justify-center w-10 h-10 group shrink-0">
-              <div className="absolute inset-0 bg-primary opacity-20 blur-md rounded-full group-hover:opacity-30 transition-opacity duration-500"></div>
-              <div className="relative flex items-center justify-center w-8 h-8 bg-gradient-to-br from-primary to-blue-700 rounded-lg shadow-md shadow-primary/30 border border-white/20">
-                <ClipboardCheck className="w-4 h-4 text-white drop-shadow-sm" strokeWidth={2.5} />
-              </div>
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-teal-400 border-[1.5px] border-white dark:border-slate-900 rounded-full flex items-center justify-center shadow-sm z-10">
-                <Sparkles className="w-[5px] h-[5px] text-teal-950 fill-teal-950" />
-              </div>
+            <div className="relative flex items-center justify-center w-10 h-10 shrink-0">
+              <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain rounded-lg" />
             </div>
           )}
           <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white truncate">
@@ -282,12 +276,7 @@ const Layout = ({ children }: LayoutProps) => {
               <img src={logoUrl} alt="Logo" className="w-8 h-8 object-contain rounded-lg shadow-sm bg-white" />
             ) : (
               <div className="relative flex items-center justify-center w-8 h-8 shrink-0">
-                <div className="relative flex items-center justify-center w-7 h-7 bg-gradient-to-br from-primary to-blue-700 rounded-md shadow-sm border border-white/20">
-                  <ClipboardCheck className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
-                </div>
-                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-teal-400 border-[1.5px] border-white dark:border-slate-900 rounded-full flex items-center justify-center shadow-sm z-10">
-                  <Sparkles className="w-1 h-1 text-teal-950 fill-teal-950" />
-                </div>
+                <img src="/logo.png" alt="Logo" className="w-7 h-7 object-contain rounded-md" />
               </div>
             )}
             <h1 className="font-extrabold text-lg truncate max-w-[120px]">

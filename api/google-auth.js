@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { code, userId } = req.body;
+    const { code, userId, redirectUri } = req.body;
 
     if (!code || !userId) {
       return res.status(400).json({ error: 'Code and userId are required' });
@@ -29,10 +29,8 @@ export default async function handler(req, res) {
     const client_id = process.env.VITE_GOOGLE_CLIENT_ID;
     const client_secret = process.env.GOOGLE_CLIENT_SECRET;
     
-    // Na Vercel, usamos a URL do site. Em desenvolvimento, localhost.
-    const redirect_uri = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : 'http://localhost:8080';
+    // Usar a redirectUri enviada pelo frontend para garantir consistência
+    const redirect_uri = redirectUri || 'http://localhost:8080';
 
     // 1. Trocar o código por tokens no Google
     const response = await fetch('https://oauth2.googleapis.com/token', {

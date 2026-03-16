@@ -86,16 +86,16 @@ const Auth = () => {
     }
   };
 
-  return <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
+  return <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50/50 dark:from-slate-950 dark:to-slate-900 p-4">
     {/* Brand Visual Identity - Premium Composition */}
     <div className="flex flex-col items-center mb-10">
       <div className="relative flex items-center justify-center w-20 h-20 mb-5 group">
         {/* Sombra de Brilho Dinâmica */}
         <div className="absolute inset-0 bg-primary opacity-20 blur-xl rounded-full group-hover:opacity-30 transition-opacity duration-500"></div>
 
-        {/* Container do Ícone (Glassmorphism look) */}
-        <div className="relative flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary to-blue-700 rounded-[1.25rem] shadow-xl shadow-primary/30 border border-white/20">
-          <ClipboardCheck className="w-8 h-8 text-white drop-shadow-md" strokeWidth={2.5} />
+        {/* Container do Ícone - Ampliado e sem bordas brancas */}
+        <div className="relative flex items-center justify-center w-24 h-24 mb-6 transition-transform hover:scale-105 duration-300">
+          <img src="/logo.png" alt="RT Expert Logo" className="w-full h-full object-contain drop-shadow-2xl" />
         </div>
 
         {/* Elemento Extra (Notificação de Sucesso/Brilho) */}
@@ -227,7 +227,7 @@ const Auth = () => {
     </Card>
 
     <p className="mt-8 text-xs text-slate-500 dark:text-slate-400 font-medium">
-      © {new Date().getFullYear()} RT-Checklist. Gestão Simplificada.
+      © 2025 RT Expert - rDs Systems
     </p>
   </div>;
 };
