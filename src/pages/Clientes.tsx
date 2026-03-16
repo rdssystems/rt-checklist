@@ -39,12 +39,23 @@ const Clientes = () => {
   const [formData, setFormData] = useState<Partial<Cliente>>({});
   const [loading, setLoading] = useState(false);
   const [geocodeConfirmOpen, setGeocodeConfirmOpen] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
     fetchClientes();
   }, []);
 
   const fetchClientes = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase.from("profiles").select("plan_type, trial_ends_at").eq("id", user.id).single();
+      if (profile) {
+        const now = new Date();
+        const trialEnds = profile.trial_ends_at ? new Date(profile.trial_ends_at) : null;
+        setIsPremium(profile.plan_type === 'premium' || (trialEnds ? trialEnds > now : false));
+      }
+    }
+
     const { data, error } = await supabase
       .from("clientes")
       .select("*")
@@ -85,6 +96,13 @@ const Clientes = () => {
   const fetchCNPJ = async (cnpj: string) => {
     const cleanCNPJ = cnpj.replace(/\D/g, "");
     if (cleanCNPJ.length !== 14) return;
+
+    if (!isPremium) {
+      toast.error("Consulta automática de CNPJ disponível apenas no plano Premium", {
+        description: "Assine o RT Expert para automatizar seus cadastros."
+      });
+      return;
+    }
 
     setLoading(true);
     try {

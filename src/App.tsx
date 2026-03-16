@@ -13,6 +13,7 @@ import ChecklistDesigner from "./pages/ChecklistDesigner";
 import AplicarChecklist from "./pages/AplicarChecklist";
 import ChecklistsProntos from "./pages/ChecklistsProntos";
 import Visitas from "./pages/Visitas";
+import Upgrade from "./pages/Upgrade";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/aplicar-checklist" element={<AplicarChecklist />} />
             <Route path="/checklists-prontos" element={<ChecklistsProntos />} />
             <Route path="/visitas" element={<Visitas />} />
+            <Route path="/upgrade" element={<Upgrade />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

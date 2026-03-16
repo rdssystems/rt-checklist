@@ -50,6 +50,7 @@ const Layout = ({ children }: LayoutProps) => {
   const [logoUrl, setLogoUrl] = useState("");
   const [userName, setUserName] = useState("Usuário");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [planStatus, setPlanStatus] = useState<{ isPremium: boolean; planType: string; daysLeft: number } | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -87,6 +88,17 @@ const Layout = ({ children }: LayoutProps) => {
       setLogoUrl(profileData.logo_url || "");
       setUserName(profileData.nome_rt || "Usuário");
       setAvatarUrl(profileData.avatar_url || "");
+      
+      const now = new Date();
+      const trialEnds = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
+      const trialActive = trialEnds ? trialEnds > now : false;
+      const daysLeft = trialEnds ? Math.max(0, Math.ceil((trialEnds.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+      
+      setPlanStatus({
+        isPremium: profileData.plan_type === 'premium' || trialActive,
+        planType: profileData.plan_type || 'free',
+        daysLeft
+      });
     }
   };
 
@@ -200,6 +212,42 @@ const Layout = ({ children }: LayoutProps) => {
             <LogOut className="w-5 h-5" />
             <span>Sair</span>
           </button>
+
+          {/* Plan Status Card in Sidebar */}
+          {planStatus && (
+            <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
+              <Link to="/upgrade" className="flex items-center justify-between mb-2 group cursor-pointer">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-primary transition-colors">Meu Plano</span>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                  planStatus.isPremium ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400" : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                )}>
+                  {planStatus.isPremium ? "Expert" : "Free"}
+                </span>
+              </Link>
+              
+              {planStatus.daysLeft > 0 && planStatus.isPremium && planStatus.planType !== 'premium' && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Trial Expert</span>
+                    <span className="font-bold text-primary">{planStatus.daysLeft} dias</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary transition-all duration-1000" 
+                      style={{ width: `${(planStatus.daysLeft / 7) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {planStatus.planType !== 'premium' && (
+                <Link to="/upgrade" className="block text-center text-[11px] font-bold text-primary hover:underline mt-1 uppercase">
+                  Assinar Plano Expert
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </aside>
 

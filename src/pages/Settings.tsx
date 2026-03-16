@@ -27,6 +27,7 @@ const Settings = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -58,6 +59,10 @@ const Settings = () => {
       setEmail(profileData.email || "");
       setAvatarUrl(profileData.avatar_url || "");
       setGoogleConnected(!!profileData.google_access_token);
+      
+      const now = new Date();
+      const trialEnds = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
+      setIsPremium(profileData.plan_type === 'premium' || (trialEnds ? trialEnds > now : false));
     }
   };
 
@@ -463,20 +468,27 @@ const Settings = () => {
                     {googleLoading ? "Desconectando..." : "Desconectar Conta Google"}
                   </Button>
                 ) : (
-                  <Button 
-                    className="w-full sm:w-64 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-sm h-11 flex items-center justify-center gap-3"
-                    onClick={() => handleGoogleLogin()}
-                    disabled={googleLoading}
-                  >
-                    {googleLoading ? (
-                      "Conectando..."
-                    ) : (
-                      <>
-                        <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" className="w-5 h-5" alt="G" />
-                        Conectar Google Agenda
-                      </>
+                  <div className="w-full sm:w-64 space-y-2">
+                    <Button 
+                      className="w-full bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-sm h-11 flex items-center justify-center gap-3 disabled:opacity-70"
+                      onClick={() => handleGoogleLogin()}
+                      disabled={googleLoading || !isPremium}
+                    >
+                      {googleLoading ? (
+                        "Conectando..."
+                      ) : (
+                        <>
+                          <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" className="w-5 h-5" alt="G" />
+                          Conectar Google Agenda
+                        </>
+                      )}
+                    </Button>
+                    {!isPremium && (
+                      <p className="text-[10px] text-amber-600 font-bold text-center uppercase tracking-tighter">
+                        Disponível no Plano Premium
+                      </p>
                     )}
-                  </Button>
+                  </div>
                 )}
                 
                 <p className="text-[10px] text-muted-foreground text-center max-w-[200px]">

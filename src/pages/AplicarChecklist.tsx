@@ -585,7 +585,21 @@ const AplicarChecklist = () => {
       toast.error("As assinaturas são obrigatórias");
       return;
     }
+    
     setLoading(true);
+
+    // Import dinâmico da lógica de limites
+    const { checkChecklistLimit } = await import("@/lib/plan-limits");
+    const { canCreate, total } = await checkChecklistLimit();
+    
+    if (!canCreate) {
+      toast.error("Limite mensal atingido!", {
+        description: `Você já utilizou seus 5 checklists mensais do plano gratuito (${total}/5). Faça upgrade para ilimitado.`,
+        duration: 6000
+      });
+      setLoading(false);
+      return;
+    }
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error("Usuário não autenticado");
