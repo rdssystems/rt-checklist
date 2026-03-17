@@ -4,7 +4,7 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, ClipboardList, Save, Edit3, Settings, GripVertical, BoxSelect, ToggleLeft, CalendarDays, List, ImageIcon, Type } from "lucide-react";
+import { Plus, Trash2, ClipboardList, Save, Edit3, Settings, GripVertical, BoxSelect, ToggleLeft, CalendarDays, List, ImageIcon, Type, Copy, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 type FieldType = "texto" | "sim_nao_na" | "observacao" | "foto" | "multipla_escolha" | "data" | "outros";
@@ -16,6 +16,7 @@ interface FieldItem {
   placeholder?: string;
   obrigatorio?: boolean;
   opcoes?: string[];
+  tem_observacao?: boolean;
 }
 
 interface Secao {
@@ -146,6 +147,46 @@ const ChecklistDesigner = () => {
       return s;
     }));
     if (activeCampoId === campoId) setActiveCampoId(null);
+  };
+
+  const moveCampo = (secaoId: string, campoId: string, direction: 'up' | 'down') => {
+    setSecoes(secoes.map(s => {
+      if (s.id === secaoId) {
+        const index = s.campos.findIndex(c => c.id === campoId);
+        if (index === -1) return s;
+        
+        const newCampos = [...s.campos];
+        if (direction === 'up' && index > 0) {
+          [newCampos[index], newCampos[index - 1]] = [newCampos[index - 1], newCampos[index]];
+        } else if (direction === 'down' && index < newCampos.length - 1) {
+          [newCampos[index], newCampos[index + 1]] = [newCampos[index + 1], newCampos[index]];
+        }
+        return { ...s, campos: newCampos };
+      }
+      return s;
+    }));
+  };
+
+  const duplicarCampo = (secaoId: string, campoId: string) => {
+    setSecoes(secoes.map(s => {
+      if (s.id === secaoId) {
+        const index = s.campos.findIndex(c => c.id === campoId);
+        if (index === -1) return s;
+        
+        const campoOriginal = s.campos[index];
+        const novoCampo = {
+          ...campoOriginal,
+          id: crypto.randomUUID(),
+          label: `${campoOriginal.label} (Cópia)`
+        };
+        
+        const newCampos = [...s.campos];
+        newCampos.splice(index + 1, 0, novoCampo);
+        return { ...s, campos: newCampos };
+      }
+      return s;
+    }));
+    toast.success("Campo duplicado!");
   };
 
   const updateCampo = (campoId: string, updates: Partial<FieldItem>) => {
@@ -475,9 +516,18 @@ const ChecklistDesigner = () => {
                             </div>
                           </div>
 
-                          {/* Quick Actions (Delete) */}
+                          {/* Quick Actions (Delete, Move, Duplicate) */}
                           {isActive && (
-                            <div className="absolute -right-3 top-[-10px] flex gap-2">
+                            <div className="absolute -right-3 top-[-10px] flex gap-1">
+                              <button onClick={(e) => { e.stopPropagation(); moveCampo(secao.id, campo.id, 'up'); }} className="p-1.5 bg-white dark:bg-slate-800 rounded-md shadow-md border border-slate-200 text-slate-400 hover:text-primary transition-colors">
+                                <ChevronUp className="w-4 h-4" />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); moveCampo(secao.id, campo.id, 'down'); }} className="p-1.5 bg-white dark:bg-slate-800 rounded-md shadow-md border border-slate-200 text-slate-400 hover:text-primary transition-colors">
+                                <ChevronDown className="w-4 h-4" />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); duplicarCampo(secao.id, campo.id); }} className="p-1.5 bg-white dark:bg-slate-800 rounded-md shadow-md border border-slate-200 text-slate-400 hover:text-primary transition-colors">
+                                <Copy className="w-4 h-4" />
+                              </button>
                               <button onClick={(e) => { e.stopPropagation(); removeCampo(secao.id, campo.id); }} className="p-1.5 bg-white dark:bg-slate-800 rounded-md shadow-md border border-slate-200 text-slate-400 hover:text-red-500 transition-colors">
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -621,6 +671,18 @@ const ChecklistDesigner = () => {
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${activeField.obrigatorio ? "translate-x-6" : "translate-x-1"}`}></span>
                   </button>
                 </div>
+
+                {activeField.tipo === "multipla_escolha" && (
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Habilitar Observação</label>
+                    <button
+                      onClick={() => updateCampo(activeField.id, { tem_observacao: !activeField.tem_observacao })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${activeField.tem_observacao ? "bg-primary" : "bg-slate-200 dark:bg-slate-700"}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${activeField.tem_observacao ? "translate-x-6" : "translate-x-1"}`}></span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

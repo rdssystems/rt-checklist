@@ -34,6 +34,7 @@ interface CampoChecklist {
   label: string;
   opcoes?: string[];
   obrigatorio?: boolean;
+  tem_observacao?: boolean;
 }
 
 interface Modelo {
@@ -368,6 +369,11 @@ const AplicarChecklist = () => {
           }
         } else if (resposta !== undefined && resposta !== null && resposta !== "") {
           respostaText = String(resposta);
+        }
+
+        const observacao = respostas[`${campo.id}_observacao`];
+        if (observacao) {
+          respostaText += `\nObs: ${observacao}`;
         }
 
         pdf.setDrawColor(200, 200, 200);
@@ -849,6 +855,17 @@ const AplicarChecklist = () => {
                                     );
                                   })}
                                 </div>
+                                {campo.tem_observacao && (
+                                  <div className="mt-2 space-y-1.5 pt-2 border-t border-dashed border-slate-200">
+                                    <Label className="text-xs font-bold text-slate-500 uppercase">Observações Adicionais</Label>
+                                    <Textarea
+                                      placeholder="Descreva observações sobre este item..."
+                                      value={respostas[`${campo.id}_observacao`] || ""}
+                                      onChange={e => handleResposta(`${campo.id}_observacao`, e.target.value)}
+                                      className="min-h-[80px]"
+                                    />
+                                  </div>
+                                )}
                               </div>
                             )}
 
@@ -865,8 +882,22 @@ const AplicarChecklist = () => {
                                     </div>
                                   ))}
                                   <label className={`aspect-square flex flex-col items-center justify-center border-2 border-dashed rounded-xl cursor-pointer ${uploadingFields[campo.id] ? 'bg-slate-100 animate-pulse' : 'hover:bg-primary/5'}`}>
-                                    {uploadingFields[campo.id] ? <Loader2 className="animate-spin text-primary" /> : <Camera className="text-slate-400" />}
+                                    {uploadingFields[campo.id] ? <Loader2 className="animate-spin text-primary" /> : (
+                                      <>
+                                        <ImageIconLucide className="text-slate-400 w-5 h-5 mb-1" />
+                                        <span className="text-[10px] text-slate-500">Galeria</span>
+                                      </>
+                                    )}
                                     <input type="file" multiple accept="image/*" className="hidden" disabled={uploadingFields[campo.id]} onChange={e => handleImageUpload(campo.id, e)} />
+                                  </label>
+                                  <label className={`aspect-square flex flex-col items-center justify-center border-2 border-dashed rounded-xl cursor-pointer ${uploadingFields[campo.id] ? 'bg-slate-100 animate-pulse' : 'hover:bg-primary/5'}`}>
+                                    {uploadingFields[campo.id] ? <Loader2 className="animate-spin text-primary" /> : (
+                                      <>
+                                        <Camera className="text-primary w-5 h-5 mb-1" />
+                                        <span className="text-[10px] text-primary font-bold">Câmera</span>
+                                      </>
+                                    )}
+                                    <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploadingFields[campo.id]} onChange={e => handleImageUpload(campo.id, e)} />
                                   </label>
                                 </div>
                               </div>
