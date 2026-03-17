@@ -666,7 +666,19 @@ const Clientes = () => {
               <Building2 className="w-5 h-5 text-primary" />
               Lista de Clientes
             </CardTitle>
-            <CardDescription>Total: {clientes.length} clientes cadastrados</CardDescription>
+            <CardDescription>
+              Total: {clientes.length} clientes cadastrados
+              <div className="mt-1 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5 mr-3">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span> 
+                  No mapa
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500"></span> 
+                  Fora do mapa (Edite para enviar as coordenadas manualmente)
+                </span>
+              </div>
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -683,7 +695,13 @@ const Clientes = () => {
                   {clientes.map((cliente) => (
                     <TableRow key={cliente.id}>
                       <TableCell className="font-medium px-2 sm:px-4 max-w-[120px] sm:max-w-none truncate text-xs sm:text-sm">
-                        {cliente.nome_fantasia || cliente.razao_social}
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className={`w-2 h-2 shrink-0 rounded-full ${cliente.latitude && cliente.longitude ? 'bg-emerald-500' : 'bg-red-500'}`} 
+                            title={cliente.latitude && cliente.longitude ? 'Coordenadas configuradas' : 'Sem coordenadas'}
+                          />
+                          <span className="truncate">{cliente.nome_fantasia || cliente.razao_social}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="px-2 sm:px-4 text-[10px] sm:text-sm whitespace-nowrap">
                         {formatCNPJ(cliente.cnpj)}
