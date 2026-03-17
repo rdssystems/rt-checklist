@@ -600,7 +600,7 @@ const ChecklistsProntos = () => {
         <div className="mb-6">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <FileCheck className="w-8 h-8" />
-            Visitas Concluídas
+            Visitas Feitas
           </h1>
           <p className="text-muted-foreground mt-2">
             Visualize e baixe os checklists já aplicados

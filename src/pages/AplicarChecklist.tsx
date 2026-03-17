@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { syncToGoogleCalendar } from "@/lib/google-calendar";
 import Layout from "@/components/Layout";
@@ -47,6 +48,7 @@ interface Modelo {
 }
 
 const AplicarChecklist = () => {
+  const [searchParams] = useSearchParams();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [modelos, setModelos] = useState<Modelo[]>([]);
   const [clienteSelecionado, setClienteSelecionado] = useState<string>("");
@@ -66,6 +68,7 @@ const AplicarChecklist = () => {
   const [companyName, setCompanyName] = useState<string>("");
   const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Persistence: Load from localStorage on init
   useEffect(() => {
@@ -81,10 +84,19 @@ const AplicarChecklist = () => {
         console.error("Erro ao carregar progresso salvo:", e);
       }
     }
-  }, []);
+
+    // Check for clienteId in URL if no saved progress or to override
+    const urlClienteId = searchParams.get("clienteId");
+    if (urlClienteId) {
+      setClienteSelecionado(urlClienteId);
+    }
+
+    setIsLoaded(true);
+  }, [searchParams]);
 
   // Persistence: Save to localStorage when state changes
   useEffect(() => {
+    if (!isLoaded) return;
     if (clienteSelecionado || modeloSelecionado || Object.keys(respostas).length > 0) {
       localStorage.setItem("checklist_progress", JSON.stringify({
         clienteId: clienteSelecionado,
@@ -93,7 +105,7 @@ const AplicarChecklist = () => {
         sectionIndex: currentSectionIndex
       }));
     }
-  }, [clienteSelecionado, modeloSelecionado, respostas, currentSectionIndex]);
+  }, [clienteSelecionado, modeloSelecionado, respostas, currentSectionIndex, isLoaded]);
 
   const clearProgress = () => {
     localStorage.removeItem("checklist_progress");
@@ -155,20 +167,30 @@ const AplicarChecklist = () => {
     }));
   };
 
-  const handleImageUpload = async (campoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
+  const handleImageUpload = async (campoId: string, eventOrBlob: React.ChangeEvent<HTMLInputElement> | Blob) => {
+    let files: FileList | null = null;
+    let singleBlob: Blob | null = null;
+
+    if ('target' in eventOrBlob) {
+      files = eventOrBlob.target.files;
+    } else {
+      singleBlob = eventOrBlob;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
-    if (!files || files.length === 0 || !user) return;
+    if ((!files || files.length === 0) && !singleBlob) return;
+    if (!user) return;
 
     setUploadingFields(prev => ({ ...prev, [campoId]: true }));
 
     try {
       const newUrls = [...(respostas[campoId] || [])];
+      const itemsToProcess = files ? Array.from(files) : [singleBlob as Blob];
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      for (let i = 0; i < itemsToProcess.length; i++) {
+        const item = itemsToProcess[i];
 
-        const compressedBlob = await compressImage(file, {
+        const compressedBlob = await compressImage(item as File | Blob, {
           maxWidth: 1024,
           quality: 0.7
         });
@@ -193,7 +215,7 @@ const AplicarChecklist = () => {
       }
 
       handleResposta(campoId, newUrls);
-      toast.success(`${files.length > 1 ? 'Fotos carregadas' : 'Foto carregada'} com sucesso!`);
+      toast.success(itemsToProcess.length > 1 ? 'Fotos carregadas com sucesso!' : 'Foto carregada com sucesso!');
     } catch (error) {
       console.error('Error uploading images:', error);
       toast.error("Erro ao fazer upload das fotos");
@@ -752,371 +774,353 @@ const AplicarChecklist = () => {
   };
 
   return (
-    <Layout>
-      <div className="p-6 md:p-8 space-y-8">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-foreground mb-1">Fazer Inspeção</h1>
-            <p className="text-muted-foreground text-sm">Selecione o alvo da vistoria abaixo</p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4 flex-[2] w-full xl:max-w-3xl">
-            <div className="flex-1 space-y-1.5">
-              <Label className="text-xs font-bold text-slate-500 uppercase ml-1">Cliente / Estabelecimento</Label>
-              <Select
-                value={clientes.find(c => c.id === clienteSelecionado) ? { value: clienteSelecionado, label: clientes.find(c => c.id === clienteSelecionado)!.nome_fantasia || clientes.find(c => c.id === clienteSelecionado)!.razao_social } : null}
-                onChange={(option) => setClienteSelecionado(option?.value || "")}
-                options={clientes.map(cliente => ({
-                  value: cliente.id,
-                  label: cliente.nome_fantasia || cliente.razao_social
-                }))}
-                placeholder="Buscar cliente..."
-                isClearable
-                styles={customSelectStyles}
-                classNamePrefix="react-select"
-              />
+    <>
+      <Layout>
+        <div className="p-2 sm:p-4 md:p-8 space-y-4 md:space-y-6">
+          {/* Header Card */}
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="flex-1">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Fazer Inspeção</h1>
+              <p className="text-muted-foreground text-sm">Selecione o alvo da vistoria abaixo</p>
             </div>
 
-            <div className="flex-1 space-y-1.5">
-              <Label className="text-xs font-bold text-slate-500 uppercase ml-1">Modelo de Vistoria</Label>
-              <Select
-                value={modelos.find(m => m.id === modeloSelecionado) ? { value: modeloSelecionado, label: modelos.find(m => m.id === modeloSelecionado)!.nome_modelo } : null}
-                onChange={(option) => {
-                  setModeloSelecionado(option?.value || "");
-                  setCurrentSectionIndex(0);
-                }}
-                options={modelos.map(modelo => ({
-                  value: modelo.id,
-                  label: modelo.nome_modelo
-                }))}
-                placeholder="Buscar checklist..."
-                isClearable
-                styles={customSelectStyles}
-                classNamePrefix="react-select"
-              />
-            </div>
-          </div>
-          {(clienteSelecionado || modeloSelecionado) && (
-            <Button variant="ghost" size="sm" onClick={clearProgress} className="text-red-500 hover:text-red-600">
-              <X className="w-4 h-4 mr-2" /> Limpar Tudo
-            </Button>
-          )}
-        </div>
-
-        {clienteAtual && (
-          <Card className="shadow-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-primary" />
-                Dados do Cliente
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div><span className="font-semibold">Razão Social:</span> {clienteAtual.razao_social}</div>
-                <div><span className="font-semibold">CNPJ:</span> {formatCNPJ(clienteAtual.cnpj)}</div>
-                <div><span className="font-semibold">Endereço:</span> {[clienteAtual.rua, clienteAtual.bairro, clienteAtual.cidade, clienteAtual.estado].filter(Boolean).join(", ") || "Não informado"}</div>
-                <div><span className="font-semibold">Responsável Legal:</span> {clienteAtual.responsavel_legal || "Não informado"}</div>
+            <div className="flex flex-col sm:flex-row gap-3 flex-[2] w-full">
+              <div className="flex-1 space-y-1">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Cliente</Label>
+                <Select
+                  value={clientes.find(c => c.id === clienteSelecionado) ? { value: clienteSelecionado, label: clientes.find(c => c.id === clienteSelecionado)!.nome_fantasia || clientes.find(c => c.id === clienteSelecionado)!.razao_social } : null}
+                  onChange={(option) => setClienteSelecionado(option?.value || "")}
+                  options={clientes.map(cliente => ({
+                    value: cliente.id,
+                    label: cliente.nome_fantasia || cliente.razao_social
+                  }))}
+                  placeholder="Buscar cliente..."
+                  isClearable
+                  styles={customSelectStyles}
+                />
               </div>
-                   {modeloAtual && (
-          <div className="space-y-6">
-            <Card className="shadow-md">
-              <CardHeader>
-                <CardTitle>Checklist: {modeloAtual.nome_modelo}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-8">
-                {!isReviewMode && (() => {
-                  const secoes = modeloAtual.estrutura_json?.secoes || [];
-                  const activeSecao = secoes[currentSectionIndex];
-                  
-                  if (!activeSecao) return null;
 
-                  return (
-                    <div key={activeSecao.id} className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                      <div className="bg-primary/5 p-4 rounded-lg flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-bold text-primary uppercase tracking-tight">Seção {currentSectionIndex + 1} de {secoes.length}</p>
-                          <h3 className="text-xl font-bold text-slate-900 dark:text-white">{activeSecao.titulo}</h3>
-                        </div>
-                        <div className="h-2 w-32 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary transition-all duration-500" 
-                            style={{ width: `${((currentSectionIndex + 1) / secoes.length) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      
-                      {activeSecao.descricao && <p className="text-sm text-muted-foreground">{activeSecao.descricao}</p>}
-                      
-                      <div className="space-y-6">
-                        {activeSecao.campos?.map(campo => (
-                          <div key={campo.id} className="space-y-2 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
-                            {campo.tipo === "titulo" && <h4 className="text-lg font-semibold text-primary">{campo.label}</h4>}
-                            {campo.tipo === "descricao" && <p className="text-muted-foreground italic">{campo.label}</p>}
+              <div className="flex-1 space-y-1">
+                <Label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Modelo</Label>
+                <Select
+                  value={modelos.find(m => m.id === modeloSelecionado) ? { value: modeloSelecionado, label: modelos.find(m => m.id === modeloSelecionado)!.nome_modelo } : null}
+                  onChange={(option) => {
+                    setModeloSelecionado(option?.value || "");
+                    setCurrentSectionIndex(0);
+                  }}
+                  options={modelos.map(modelo => ({
+                    value: modelo.id,
+                    label: modelo.nome_modelo
+                  }))}
+                  placeholder="Buscar checklist..."
+                  isClearable
+                  styles={customSelectStyles}
+                />
+              </div>
+            </div>
+            
+            {(clienteSelecionado || modeloSelecionado) && (
+              <Button variant="ghost" size="sm" onClick={clearProgress} className="text-red-500 hover:text-red-600 self-end">
+                <X className="w-4 h-4 mr-1" /> Limpar
+              </Button>
+            )}
+          </div>
 
-                            {campo.tipo === "texto" && (
-                              <div className="space-y-2">
-                                <Label className="text-base font-semibold">{campo.label} {campo.obrigatorio && "*"}</Label>
-                                <Input value={respostas[campo.id] || ""} onChange={e => handleResposta(campo.id, e.target.value)} placeholder="Sua resposta..." />
+          {clienteAtual && (
+            <div className="space-y-4">
+              <Card className="shadow-sm border-0 sm:border overflow-hidden">
+                <CardHeader className="p-4 bg-slate-50/50 border-b">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Building2 className="w-5 h-5 text-primary" />
+                    Dados do Cliente
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div><span className="font-semibold text-slate-500">Razão Social:</span> {clienteAtual.razao_social}</div>
+                    <div><span className="font-semibold text-slate-500">CNPJ:</span> {formatCNPJ(clienteAtual.cnpj)}</div>
+                    <div><span className="font-semibold text-slate-500">Endereço:</span> {[clienteAtual.rua, clienteAtual.bairro, clienteAtual.cidade, clienteAtual.estado].filter(Boolean).join(", ") || "Não informado"}</div>
+                    <div><span className="font-semibold text-slate-500">Responsável:</span> {clienteAtual.responsavel_legal || "Não informado"}</div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {modeloAtual && (
+                <div className="space-y-4">
+                  <Card className="shadow-md border-0 sm:border overflow-hidden">
+                    <CardHeader className="p-4 border-b">
+                      <CardTitle className="text-lg">Checklist: {modeloAtual.nome_modelo}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-2 sm:p-6">
+                      {!isReviewMode ? (() => {
+                        const secoes = modeloAtual.estrutura_json?.secoes || [];
+                        const activeSecao = secoes[currentSectionIndex];
+                        
+                        if (!activeSecao) return null;
+
+                        return (
+                          <div key={activeSecao.id} className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <div className="bg-primary/5 p-3 rounded-lg flex items-center justify-between border border-primary/10">
+                              <div>
+                                <p className="text-[10px] font-bold text-primary uppercase tracking-tight">Seção {currentSectionIndex + 1} de {secoes.length}</p>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{activeSecao.titulo}</h3>
                               </div>
-                            )}
+                              <div className="h-2 w-20 md:w-32 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-primary transition-all duration-500" 
+                                  style={{ width: `${((currentSectionIndex + 1) / secoes.length) * 100}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                            
+                            {activeSecao.descricao && <p className="text-sm text-muted-foreground px-1">{activeSecao.descricao}</p>}
+                            
+                            <div className="space-y-4">
+                              {activeSecao.campos?.map(campo => (
+                                <div key={campo.id} className="space-y-3 p-3 md:p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                                  {campo.tipo === "titulo" && <h4 className="text-lg font-semibold text-primary">{campo.label}</h4>}
+                                  {campo.tipo === "descricao" && <p className="text-muted-foreground italic text-sm">{campo.label}</p>}
 
-                            {campo.tipo === "sim_nao_na" && (
-                              <div className="space-y-3">
-                                <Label className="text-base font-semibold">{campo.label} {campo.obrigatorio && "*"}</Label>
-                                <RadioGroup value={respostas[campo.id] || ""} onValueChange={val => handleResposta(campo.id, val)} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                  {["Sim", "Não", "N.A"].map(opt => (
-                                    <div key={opt} className="flex items-center space-x-2 bg-white dark:bg-slate-950 px-3 py-3 rounded-md border border-slate-200 hover:border-primary transition-colors cursor-pointer group">
-                                      <RadioGroupItem value={opt} id={`${campo.id}-${opt}`} />
-                                      <Label htmlFor={`${campo.id}-${opt}`} className="cursor-pointer flex-1 font-medium">{opt}</Label>
+                                  {campo.tipo === "texto" && (
+                                    <div className="space-y-1.5">
+                                      <Label className="text-sm font-semibold">{campo.label} {campo.obrigatorio && "*"}</Label>
+                                      <Input value={respostas[campo.id] || ""} onChange={e => handleResposta(campo.id, e.target.value)} placeholder="Sua resposta..." />
                                     </div>
-                                  ))}
-                                </RadioGroup>
-                              </div>
-                            )}
+                                  )}
 
-                            {campo.tipo === "multipla_escolha" && (
-                              <div className="space-y-3">
-                                <Label className="text-base font-semibold">{campo.label} {campo.obrigatorio && "*"}</Label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                                  {campo.opcoes?.map((opcao, idx) => {
-                                    const isOutros = opcao === "Outros";
-                                    return (
-                                      <div key={idx} className="space-y-2">
-                                        <div className="flex items-center space-x-2 bg-white dark:bg-slate-950 px-3 py-3 rounded-md border border-slate-200 hover:border-primary transition-colors cursor-pointer">
-                                          <Checkbox
-                                            id={`${campo.id}-${idx}`}
-                                            checked={respostas[campo.id]?.includes(opcao) || false}
-                                            onCheckedChange={checked => {
-                                              const current = respostas[campo.id] || [];
-                                              if (checked) handleResposta(campo.id, [...current, opcao]);
-                                              else handleResposta(campo.id, current.filter((v: string) => v !== opcao));
-                                            }}
-                                          />
-                                          <Label htmlFor={`${campo.id}-${idx}`} className="cursor-pointer flex-1 font-medium">{opcao}</Label>
-                                        </div>
-                                        {isOutros && respostas[campo.id]?.includes("Outros") && (
-                                          <Input
-                                            className="ml-6 w-[calc(100%-1.5rem)]"
-                                            placeholder="Especifique..."
-                                            value={respostas[`${campo.id}_outros_text`] || ""}
-                                            onChange={e => handleResposta(`${campo.id}_outros_text`, e.target.value)}
-                                          />
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                                {campo.tem_observacao && (
-                                  <div className="mt-2 space-y-1.5 pt-2 border-t border-dashed border-slate-200">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase">Observações Adicionais</Label>
-                                    <Textarea
-                                      placeholder="Descreva observações sobre este item..."
-                                      value={respostas[`${campo.id}_observacao`] || ""}
-                                      onChange={e => handleResposta(`${campo.id}_observacao`, e.target.value)}
-                                      className="min-h-[80px]"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {campo.tipo === "foto" && (
-                              <div className="space-y-3">
-                                <Label className="text-base font-semibold flex items-center gap-2">
-                                  <Camera className="w-4 h-4 text-primary" /> {campo.label} {campo.obrigatorio && "*"}
-                                </Label>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-                                  {respostas[campo.id]?.map((url: string, idx: number) => (
-                                    <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border">
-                                      <img src={url} alt="Evidência" className="w-full h-full object-cover" />
-                                      <button onClick={() => removeImage(campo.id, url)} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100"><X className="w-3 h-3" /></button>
-                                    </div>
-                                  ))}
-                                  <label className={`aspect-square flex flex-col items-center justify-center border-2 border-dashed rounded-xl cursor-pointer ${uploadingFields[campo.id] ? 'bg-slate-100 animate-pulse' : 'hover:bg-primary/5'}`}>
-                                    {uploadingFields[campo.id] ? <Loader2 className="animate-spin text-primary" /> : (
-                                      <>
-                                        <ImageIconLucide className="text-slate-400 w-5 h-5 mb-1" />
-                                        <span className="text-[10px] text-slate-500">Galeria</span>
-                                      </>
-                                    )}
-                                    <input type="file" multiple accept="image/*" className="hidden" disabled={uploadingFields[campo.id]} onChange={e => handleImageUpload(campo.id, e)} />
-                                  </label>
-                                  <label className={`aspect-square flex flex-col items-center justify-center border-2 border-dashed rounded-xl cursor-pointer ${uploadingFields[campo.id] ? 'bg-slate-100 animate-pulse' : 'hover:bg-primary/5'}`}>
-                                    {uploadingFields[campo.id] ? <Loader2 className="animate-spin text-primary" /> : (
-                                      <>
-                                        <Camera className="text-primary w-5 h-5 mb-1" />
-                                        <span className="text-[10px] text-primary font-bold">Câmera</span>
-                                      </>
-                                    )}
-                                    <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploadingFields[campo.id]} onChange={e => handleImageUpload(campo.id, e)} />
-                                  </label>
-                                </div>
-                              </div>
-                            )}
-
-                            {campo.tipo === "observacao" && (
-                              <div className="space-y-2">
-                                <Label className="text-base font-semibold">{campo.label}</Label>
-                                <Textarea value={respostas[campo.id] || ""} onChange={e => handleResposta(campo.id, e.target.value)} placeholder="Detalhes adicionais..." />
-                              </div>
-                            )}
-
-                            {campo.tipo === "data" && (
-                              <div className="space-y-2">
-                                <Label className="text-base font-semibold">{campo.label}</Label>
-                                <Input type="date" value={respostas[campo.id] || ""} onChange={e => handleResposta(campo.id, e.target.value)} />
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {isReviewMode && (
-                  <div className="space-y-8">
-                    <Button variant="outline" onClick={() => setIsReviewMode(false)}><ArrowLeft className="w-4 h-4 mr-2" />Voltar</Button>
-                    <Card>
-                      <CardHeader className="border-b">
-                        <CardTitle className="uppercase text-primary">Relatório de Inspeção</CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <table className="w-full text-sm">
-                          <thead className="bg-slate-50 border-b">
-                            <tr>
-                              <th className="p-3 text-left w-12">Item</th>
-                              <th className="p-3 text-left">Pergunta</th>
-                              <th className="p-3 text-left w-1/3">Resposta</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(() => {
-                              const secoes = modeloAtual.estrutura_json?.secoes || [];
-                              let idx = 1;
-                              return secoes.flatMap(secao => [
-                                secao.titulo && (
-                                  <tr key={secao.id} className="bg-slate-100/50"><td colSpan={3} className="p-3 font-bold text-primary">{secao.titulo}</td></tr>
-                                ),
-                                ...secao.campos.map(campo => {
-                                  if (campo.tipo === "titulo" || campo.tipo === "descricao") return null;
-                                  const resp = respostas[campo.id];
-                                  return (
-                                    <tr key={campo.id} className="border-b">
-                                      <td className="p-3 text-center text-slate-400">{idx++}</td>
-                                      <td className="p-3">{campo.label}</td>
-                                      <td className="p-3">
-                                        {campo.tipo === "foto" ? (
-                                          <div className="grid grid-cols-4 gap-1 w-full max-w-[200px]">
-                                            {resp?.map((u: string, i: number) => (
-                                              <div key={i} className="relative aspect-square">
-                                                <img src={u} className="w-full h-full object-cover rounded border" />
-                                                <span className="absolute bottom-0 right-0 bg-black/60 text-[8px] text-white px-0.5 rounded-tl">{i + 1}</span>
-                                              </div>
-                                            ))}
+                                  {campo.tipo === "sim_nao_na" && (
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-semibold">{campo.label} {campo.obrigatorio && "*"}</Label>
+                                      <RadioGroup value={respostas[campo.id] || ""} onValueChange={val => handleResposta(campo.id, val)} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        {["Sim", "Não", "N.A"].map(opt => (
+                                          <div key={opt} className="flex items-center space-x-2 bg-white dark:bg-slate-950 px-3 py-2.5 rounded-lg border border-slate-200 hover:border-primary transition-colors cursor-pointer">
+                                            <RadioGroupItem value={opt} id={`${campo.id}-${opt}`} />
+                                            <Label htmlFor={`${campo.id}-${opt}`} className="cursor-pointer flex-1 font-medium text-sm">{opt}</Label>
                                           </div>
-                                        ) : (
-                                          <div className="space-y-1">
-                                            <div>
-                                              {Array.isArray(resp) ? resp.join(", ") : (resp || "---")}
-                                              {respostas[`${campo.id}_outros_text`] && ` (${respostas[`${campo.id}_outros_text`]})`}
+                                        ))}
+                                      </RadioGroup>
+                                    </div>
+                                  )}
+
+                                  {campo.tipo === "multipla_escolha" && (
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-semibold">{campo.label} {campo.obrigatorio && "*"}</Label>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                        {campo.opcoes?.map((opcao: string, idx: number) => {
+                                          const isOutros = opcao === "Outros";
+                                          return (
+                                            <div key={idx} className="space-y-2">
+                                              <div className="flex items-center space-x-2 bg-white dark:bg-slate-950 px-3 py-2.5 rounded-lg border border-slate-200 hover:border-primary transition-colors cursor-pointer">
+                                                <Checkbox
+                                                  id={`${campo.id}-${idx}`}
+                                                  checked={respostas[campo.id]?.includes(opcao) || false}
+                                                  onCheckedChange={checked => {
+                                                    const current = respostas[campo.id] || [];
+                                                    if (checked) handleResposta(campo.id, [...current, opcao]);
+                                                    else handleResposta(campo.id, current.filter((v: string) => v !== opcao));
+                                                  }}
+                                                />
+                                                <Label htmlFor={`${campo.id}-${idx}`} className="cursor-pointer flex-1 font-medium text-sm">{opcao}</Label>
+                                              </div>
+                                              {isOutros && respostas[campo.id]?.includes("Outros") && (
+                                                <Input
+                                                  className="ml-6 w-[calc(100%-1.5rem)]"
+                                                  placeholder="Especifique..."
+                                                  value={respostas[`${campo.id}_outros_text`] || ""}
+                                                  onChange={e => handleResposta(`${campo.id}_outros_text`, e.target.value)}
+                                                />
+                                              )}
                                             </div>
-                                            {respostas[`${campo.id}_observacao`] && (
-                                              <div className="text-xs text-muted-foreground italic">
-                                                Obs: {respostas[`${campo.id}_observacao`]}
+                                          );
+                                        })}
+                                      </div>
+                                      {campo.tem_observacao && (
+                                        <div className="mt-2 space-y-1 pt-2 border-t border-dashed border-slate-200">
+                                          <Label className="text-[10px] font-bold text-slate-500 uppercase px-1">Observações do Item</Label>
+                                          <Textarea
+                                            placeholder="Descreva..."
+                                            value={respostas[`${campo.id}_observacao`] || ""}
+                                            onChange={e => handleResposta(`${campo.id}_observacao`, e.target.value)}
+                                            className="min-h-[60px] text-sm"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {campo.tipo === "foto" && (
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-semibold flex items-center gap-2">
+                                        <Camera className="w-4 h-4 text-primary" /> {campo.label} {campo.obrigatorio && "*"}
+                                      </Label>
+                                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                                        {respostas[campo.id]?.map((url: string, idx: number) => (
+                                          <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200">
+                                            <img src={url} alt="Evidência" className="w-full h-full object-cover" />
+                                            <button onClick={() => removeImage(campo.id, url)} className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-bl-lg shadow-sm">
+                                              <X className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        ))}
+                                        <label className={`aspect-square flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer ${uploadingFields[campo.id] ? 'bg-slate-100 animate-pulse' : 'hover:bg-primary/5'}`}>
+                                          <ImageIconLucide className="text-slate-400 w-5 h-5 mb-1" />
+                                          <span className="text-[10px] text-slate-500 uppercase font-bold">Galeria</span>
+                                          <input type="file" multiple accept="image/*" className="hidden" disabled={uploadingFields[campo.id]} onChange={e => handleImageUpload(campo.id, e)} />
+                                        </label>
+                                        <label className={`aspect-square flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer bg-primary/5 border-primary/30 ${uploadingFields[campo.id] ? 'animate-pulse' : 'hover:bg-primary/10'}`}>
+                                          <Camera className="text-primary w-5 h-5 mb-1" />
+                                          <span className="text-[10px] text-primary uppercase font-bold">Câmera</span>
+                                          <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploadingFields[campo.id]} onChange={e => handleImageUpload(campo.id, e)} />
+                                        </label>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {campo.tipo === "observacao" && (
+                                    <div className="space-y-1.5">
+                                      <Label className="text-sm font-semibold">{campo.label}</Label>
+                                      <Textarea value={respostas[campo.id] || ""} onChange={e => handleResposta(campo.id, e.target.value)} placeholder="Detalhes..." />
+                                    </div>
+                                  )}
+
+                                  {campo.tipo === "data" && (
+                                    <div className="space-y-1.5">
+                                      <Label className="text-sm font-semibold">{campo.label}</Label>
+                                      <Input type="date" value={respostas[campo.id] || ""} onChange={e => handleResposta(campo.id, e.target.value)} />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Stepper Navigation */}
+                            <div className="pt-4 flex justify-between border-t mt-4 gap-3">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setCurrentSectionIndex(prev => Math.max(0, prev - 1));
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                disabled={currentSectionIndex === 0}
+                                className="flex-1 sm:flex-none"
+                              >
+                                <ArrowLeft className="mr-2 h-4 w-4" /> Anterior
+                              </Button>
+                              
+                              {currentSectionIndex < (secoes.length - 1) ? (
+                                <Button className="flex-1 sm:flex-none" onClick={() => {
+                                  setCurrentSectionIndex(prev => prev + 1);
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}>
+                                  Próxima <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button className="flex-1 sm:flex-none bg-primary hover:bg-primary/90" onClick={() => {
+                                  setIsReviewMode(true);
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}>
+                                  Revisar <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })() : (
+                        <div className="space-y-6">
+                          <Button variant="outline" size="sm" onClick={() => setIsReviewMode(false)}><ArrowLeft className="w-4 h-4 mr-2" />Voltar</Button>
+                          <div className="overflow-x-auto border rounded-lg">
+                            <table className="w-full text-sm">
+                              <thead className="bg-slate-50 border-b">
+                                <tr>
+                                  <th className="p-2 text-left w-8">#</th>
+                                  <th className="p-2 text-left">Pergunta</th>
+                                  <th className="p-2 text-left">Resposta</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(() => {
+                                  const secoes = modeloAtual.estrutura_json?.secoes || [];
+                                  let gIdx = 1;
+                                  return secoes.flatMap(secao => [
+                                    <tr key={secao.id} className="bg-slate-100/50"><td colSpan={3} className="p-2 font-bold text-primary text-xs">{secao.titulo}</td></tr>,
+                                    ...secao.campos.map((campo: any) => {
+                                      if (campo.tipo === "titulo" || campo.tipo === "descricao") return null;
+                                      const resp = respostas[campo.id];
+                                      return (
+                                        <tr key={campo.id} className="border-b">
+                                          <td className="p-2 text-slate-400 text-[10px]">{gIdx++}</td>
+                                          <td className="p-2 text-xs font-medium">{campo.label}</td>
+                                          <td className="p-2">
+                                            {campo.tipo === "foto" ? (
+                                              <div className="flex flex-wrap gap-1">
+                                                {resp?.map((u: string, i: number) => (
+                                                  <img key={i} src={u} className="w-8 h-8 object-cover rounded border" alt="" />
+                                                ))}
+                                                {(!resp || resp.length === 0) && "---"}
+                                              </div>
+                                            ) : (
+                                              <div className="text-xs">
+                                                {Array.isArray(resp) ? resp.join(", ") : (resp || "---")}
+                                                {respostas[`${campo.id}_outros_text`] && <span className="text-primary italic ml-1">({respostas[`${campo.id}_outros_text`]})</span>}
+                                                {respostas[`${campo.id}_observacao`] && <div className="text-[10px] text-muted-foreground mt-0.5">Obs: {respostas[`${campo.id}_observacao`]}</div>}
                                               </div>
                                             )}
-                                          </div>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  )
-                                })
-                              ]);
-                            })()}
-                          </tbody>
-                        </table>
-                      </CardContent>
-                    </Card>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })
+                                  ]);
+                                })()}
+                              </tbody>
+                            </table>
+                          </div>
 
-                    <Card className="bg-primary/5 border-primary/20">
-                      <CardContent className="pt-6 space-y-6">
-                        <div className="space-y-2">
-                          <Label className="font-bold">Parecer Conclusivo</Label>
-                          <Textarea value={parecerConclusivo} onChange={e => setParecerConclusivo(e.target.value)} rows={4} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label className="font-bold">Próxima Inspeção</Label>
-                            <Input type="date" value={dataProximaInspecao} onChange={e => setDataProximaInspecao(e.target.value)} />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="font-bold">Responsável</Label>
-                            <Input value={nomeRT} disabled />
-                          </div>
-                        </div>
+                          <div className="bg-primary/5 p-4 rounded-xl space-y-4 border border-primary/10">
+                            <div className="space-y-1.5">
+                              <Label className="font-bold text-sm">Parecer Conclusivo</Label>
+                              <Textarea value={parecerConclusivo} onChange={e => setParecerConclusivo(e.target.value)} rows={3} className="text-sm" />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-1.5">
+                                <Label className="font-bold text-sm">Próxima Inspeção</Label>
+                                <Input type="date" value={dataProximaInspecao} onChange={e => setDataProximaInspecao(e.target.value)} className="text-sm" />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="font-bold text-sm">Responsável</Label>
+                                <Input value={nomeRT} disabled className="bg-slate-100 text-sm" />
+                              </div>
+                            </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t">
-                          <div className="space-y-2">
-                            <SignatureCanvas label="Assinatura Responsável Técnico" onSave={setAssinaturaRT} signatureData={assinaturaRT} />
-                            <Input value={nomeRT} disabled className="bg-slate-50" />
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2 border-t border-primary/10">
+                              <SignatureCanvas label="Responsável Técnico" onSave={setAssinaturaRT} signatureData={assinaturaRT} />
+                              <div className="space-y-2">
+                                <SignatureCanvas label="Cliente" onSave={setAssinaturaCliente} signatureData={assinaturaCliente} />
+                                <Input placeholder="Nome completo" value={nomeClienteAssinatura} onChange={e => setNomeClienteAssinatura(e.target.value)} className="h-8 text-xs" />
+                              </div>
+                              <div className="space-y-2">
+                                <SignatureCanvas label="Testemunha" onSave={setAssinaturaTestemunha} signatureData={assinaturaTestemunha} />
+                                <Input placeholder="Nome completo" value={nomeTestemunhaAssinatura} onChange={e => setNomeTestemunhaAssinatura(e.target.value)} className="h-8 text-xs" />
+                              </div>
+                            </div>
                           </div>
-                          <div className="space-y-2">
-                            <SignatureCanvas label="Assinatura Cliente" onSave={setAssinaturaCliente} signatureData={assinaturaCliente} />
-                            <Input placeholder="Nome do Cliente" value={nomeClienteAssinatura} onChange={e => setNomeClienteAssinatura(e.target.value)} />
-                          </div>
-                          <div className="space-y-2">
-                            <SignatureCanvas label="Assinatura Testemunha" onSave={setAssinaturaTestemunha} signatureData={assinaturaTestemunha} />
-                            <Input placeholder="Nome da Testemunha" value={nomeTestemunhaAssinatura} onChange={e => setNomeTestemunhaAssinatura(e.target.value)} />
+
+                          <div className="flex gap-3 justify-end pt-4">
+                            <Button onClick={gerarPDF} variant="outline" size="sm" className="flex-1 sm:flex-none"><FileDown className="mr-1.5 h-4 w-4" />PDF</Button>
+                            <Button onClick={handleSalvar} disabled={loading} size="sm" className="flex-1 sm:flex-none"><Save className="mr-1.5 h-4 w-4" />{loading ? "Salvando..." : "Salvar"}</Button>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                    <div className="flex gap-4 justify-end">
-                      <Button onClick={gerarPDF} variant="outline"><FileDown className="mr-2 h-4 w-4" />Gerar PDF</Button>
-                      <Button onClick={handleSalvar} disabled={loading}><Save className="mr-2 h-4 w-4" />{loading ? "Salvando..." : "Salvar no Sistema"}</Button>
-                    </div>
-                  </div>
-                )}
-
-                {!isReviewMode && (
-                  <div className="pt-6 flex justify-between border-t mt-8">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setCurrentSectionIndex(prev => Math.max(0, prev - 1))}
-                      disabled={currentSectionIndex === 0}
-                    >
-                      <ArrowLeft className="mr-2 h-4 w-4" /> Anterior
-                    </Button>
-                    
-                    {currentSectionIndex < (modeloAtual.estrutura_json?.secoes?.length || 0) - 1 ? (
-                      <Button onClick={() => {
-                        setCurrentSectionIndex(prev => prev + 1);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}>
-                        Próxima Seção <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button onClick={() => {
-                        setIsReviewMode(true);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }} size="lg" className="bg-primary hover:bg-primary/90">
-                        Ir para Revisão <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )}
-</div>
-</Layout>
-);
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Layout>
+    </>
+  );
 };
 
 export default AplicarChecklist;

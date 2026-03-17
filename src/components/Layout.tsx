@@ -117,8 +117,8 @@ const Layout = ({ children }: LayoutProps) => {
     { icon: ClipboardList, label: "Criar Checklist", path: "/checklist-designer" },
     { icon: FileCheck, label: "Fazer Inspeção", path: "/aplicar-checklist" },
     { icon: Map, label: "Mapa de Clientes", path: "/mapa-clientes" },
-    { icon: CheckSquare, label: "Checklists Prontos", path: "/checklists-prontos" },
-    { icon: Calendar, label: "Visitas", path: "/visitas" },
+    { icon: CheckSquare, label: "Visitas Feitas", path: "/checklists-prontos" },
+    { icon: Calendar, label: "Agenda", path: "/visitas" },
   ];
 
   const SideNav = ({ isMobile = false }: { isMobile?: boolean }) => (

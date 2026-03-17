@@ -10,7 +10,7 @@ export interface CompressionOptions {
     maintainAspectRatio?: boolean;
 }
 
-export const compressImage = (file: File, options: CompressionOptions = {}): Promise<Blob> => {
+export const compressImage = (file: Blob | File, options: CompressionOptions = {}): Promise<Blob> => {
     const {
         maxWidth = 1080,
         maxHeight = 1080,

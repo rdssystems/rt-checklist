@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +48,7 @@ interface Cliente {
 }
 
 const Visitas = () => {
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [visitas, setVisitas] = useState<Agendamento[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -178,7 +180,7 @@ const Visitas = () => {
       <div className="p-6 md:p-8 space-y-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Agenda de Visitas</h1>
+            <h1 className="text-3xl font-bold text-foreground">Agenda</h1>
             <p className="text-muted-foreground">Gerencie seus compromissos e inspeções agendadas</p>
           </div>
           <div className="flex items-center gap-2">
@@ -333,12 +335,12 @@ const Visitas = () => {
                           {visita.status === 'pendente' && (
                             <>
                               <Button 
-                                variant="outline" 
+                                variant="default" 
                                 size="sm" 
-                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                onClick={() => updateStatus(visita.id, 'concluido')}
+                                className="bg-primary hover:bg-primary/90"
+                                onClick={() => navigate(`/aplicar-checklist?clienteId=${visita.cliente.id}`)}
                               >
-                                Concluir
+                                Iniciar
                               </Button>
                               <Button 
                                 variant="ghost" 
