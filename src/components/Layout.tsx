@@ -77,7 +77,7 @@ const Layout = ({ children }: LayoutProps) => {
   const loadSettings = async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("company_name, logo_url, nome_rt, avatar_url")
+      .select("company_name, logo_url, nome_rt, avatar_url, plan_type, trial_ends_at")
       .eq("id", userId)
       .maybeSingle();
 
@@ -226,16 +226,16 @@ const Layout = ({ children }: LayoutProps) => {
                 </span>
               </Link>
               
-              {planStatus.daysLeft > 0 && planStatus.isPremium && planStatus.planType !== 'premium' && (
+              {planStatus.daysLeft > 0 && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Trial Expert</span>
-                    <span className="font-bold text-primary">{planStatus.daysLeft} dias</span>
+                    <span className="text-slate-500">{planStatus.planType === 'premium' ? 'Plano Expert' : 'Trial Expert'}</span>
+                    <span className="font-bold text-primary">{planStatus.daysLeft} {planStatus.daysLeft === 1 ? 'dia' : 'dias'}</span>
                   </div>
                   <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-primary transition-all duration-1000" 
-                      style={{ width: `${(planStatus.daysLeft / 7) * 100}%` }}
+                      style={{ width: `${Math.min(100, (planStatus.daysLeft / 30) * 100)}%` }}
                     />
                   </div>
                 </div>
@@ -384,6 +384,42 @@ const Layout = ({ children }: LayoutProps) => {
                     <LogOut className="w-5 h-5" />
                     <span>Sair</span>
                   </button>
+
+                  {/* Plan Status Card Mobile */}
+                  {planStatus && (
+                    <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
+                      <Link to="/upgrade" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between mb-2 group cursor-pointer">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-primary transition-colors">Meu Plano</span>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                          planStatus.isPremium ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400" : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                        )}>
+                          {planStatus.isPremium ? "Expert" : "Free"}
+                        </span>
+                      </Link>
+                      
+                      {planStatus.daysLeft > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">{planStatus.planType === 'premium' ? 'Plano Expert' : 'Trial Expert'}</span>
+                            <span className="font-bold text-primary">{planStatus.daysLeft} {planStatus.daysLeft === 1 ? 'dia' : 'dias'}</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary transition-all duration-1000" 
+                              style={{ width: `${Math.min(100, (planStatus.daysLeft / 30) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
+                      {planStatus.planType !== 'premium' && (
+                        <Link to="/upgrade" onClick={() => setMobileMenuOpen(false)} className="block text-center text-[11px] font-bold text-primary hover:underline mt-1 uppercase">
+                          Assinar Plano Expert
+                        </Link>
+                      )}
+                    </div>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>

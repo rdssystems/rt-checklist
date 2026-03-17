@@ -138,17 +138,19 @@ const ChecklistsProntos = () => {
       const { data: { user } } = await supabase.auth.getUser();
       let logoUrl = "";
       let companyName = "";
+      let rtCpfCnpj = "";
 
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("logo_url, company_name")
+          .select("logo_url, company_name, cpf_cnpj")
           .eq("id", user.id)
           .single();
 
         if (profile) {
           logoUrl = profile.logo_url || "";
           companyName = profile.company_name || "";
+          rtCpfCnpj = profile.cpf_cnpj || "";
         }
       }
 
@@ -198,7 +200,17 @@ const ChecklistsProntos = () => {
       if (companyName) {
         pdf.text(companyName, pageWidth - margin, yPos, { align: "right" });
       }
-      pdf.text(format(new Date(checklist.data_aplicacao), "dd/MM/yyyy"), pageWidth - margin, yPos + 5, { align: "right" });
+      
+      if (rtCpfCnpj) {
+        const formatted = rtCpfCnpj.replace(/\D/g, "").length > 11 
+          ? rtCpfCnpj.replace(/\D/g, "").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
+          : rtCpfCnpj.replace(/\D/g, "").replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+        pdf.setFontSize(8);
+        pdf.text(formatted.trim(), pageWidth - margin, yPos + 4, { align: "right" });
+        pdf.setFontSize(9);
+      }
+
+      pdf.text(format(new Date(checklist.data_aplicacao), "dd/MM/yyyy"), pageWidth - margin, yPos + (rtCpfCnpj ? 8 : 5), { align: "right" });
 
       yPos += 12; // Reduced gap from 20 to 12
 
@@ -237,7 +249,8 @@ const ChecklistsProntos = () => {
       pdf.setFont("helvetica", "bold");
       pdf.text("CNPJ:", margin + 3, yPos);
       pdf.setFont("helvetica", "normal");
-      pdf.text(checklist.clientes.cnpj, margin + 35, yPos);
+      const formattedCNPJ = (checklist.clientes.cnpj || "").replace(/\D/g, "").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+      pdf.text(formattedCNPJ, margin + 35, yPos);
       yPos += 5;
 
       const endereco = `${checklist.clientes.rua}, ${checklist.clientes.bairro}, ${checklist.clientes.cidade}, ${checklist.clientes.estado}`;
