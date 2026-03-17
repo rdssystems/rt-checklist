@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, ClipboardList, FileCheck, TrendingUp, Filter, Plus, Map, CalendarDays } from "lucide-react";
-import { startOfMonth, endOfMonth } from "date-fns";
+import { Users, ClipboardList, FileCheck, TrendingUp, Filter, Plus, Map, CalendarDays, Clock, ArrowRight } from "lucide-react";
+import { startOfMonth, endOfMonth, startOfDay, endOfDay, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import Layout from "@/components/Layout";
+import { Button } from "@/components/ui/button";
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -13,6 +15,8 @@ const Dashboard = () => {
     aplicacoes: 0,
     agendamentosMes: 0,
   });
+  const [visitasHoje, setVisitasHoje] = useState<any[]>([]);
+  const [loadingVisitas, setLoadingVisitas] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -40,7 +44,31 @@ const Dashboard = () => {
       });
     };
 
+    const fetchVisitasHoje = async () => {
+      setLoadingVisitas(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const hojeInicio = startOfDay(new Date()).toISOString();
+      const hojeFim = endOfDay(new Date()).toISOString();
+
+      const { data } = await (supabase as any)
+        .from('agendamentos')
+        .select(`
+          *,
+          cliente:clientes!cliente_id(id, razao_social, nome_fantasia)
+        `)
+        .gte('data_visita', hojeInicio)
+        .lte('data_visita', hojeFim)
+        .eq('status', 'pendente')
+        .order('data_visita', { ascending: true });
+
+      setVisitasHoje(data || []);
+      setLoadingVisitas(false);
+    };
+
     fetchStats();
+    fetchVisitasHoje();
   }, []);
 
   return (
@@ -111,6 +139,48 @@ const Dashboard = () => {
             <p className="text-slate-400 text-xs mt-2">Agendamentos neste mês</p>
           </div>
         </div>
+
+        {/* Agenda Section */}
+        {visitasHoje.length > 0 && (
+          <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+            <Card className="border-primary/20 bg-primary/5 shadow-md shadow-primary/5 overflow-hidden">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl font-bold text-primary flex items-center gap-2">
+                    <CalendarDays className="w-6 h-6" />
+                    Agenda de Hoje
+                  </CardTitle>
+                  <CardDescription className="text-primary/70">Você tem {visitasHoje.length} {visitasHoje.length === 1 ? 'visita marcada' : 'visitas marcadas'} para hoje</CardDescription>
+                </div>
+                <Link to="/visitas">
+                  <Button variant="outline" size="sm" className="border-primary/30 text-primary hover:bg-primary/10">
+                    Ver Agenda Completa <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {visitasHoje.map((visita) => (
+                    <div key={visita.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-primary/10 flex items-center justify-between shadow-sm">
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 dark:text-white truncate">
+                          {visita.cliente?.nome_fantasia || visita.cliente?.razao_social}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                          <Clock className="w-3.5 h-3.5 text-primary" />
+                          <span>{format(new Date(visita.data_visita), "HH:mm")}</span>
+                        </div>
+                      </div>
+                      <Link to={`/aplicar-checklist?clienteId=${visita.cliente_id}`}>
+                        <Button size="sm" className="h-8 text-xs bg-primary hover:bg-primary/90">Iniciar</Button>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Resources Section */}
         <div className="grid lg:grid-cols-1 gap-6">
