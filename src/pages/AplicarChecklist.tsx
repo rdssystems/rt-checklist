@@ -65,6 +65,43 @@ const AplicarChecklist = () => {
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [companyName, setCompanyName] = useState<string>("");
   const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+
+  // Persistence: Load from localStorage on init
+  useEffect(() => {
+    const savedProgress = localStorage.getItem("checklist_progress");
+    if (savedProgress) {
+      try {
+        const { clienteId, modeloId, respostas: savedRespostas, sectionIndex } = JSON.parse(savedProgress);
+        if (clienteId) setClienteSelecionado(clienteId);
+        if (modeloId) setModeloSelecionado(modeloId);
+        if (savedRespostas) setRespostas(savedRespostas);
+        if (sectionIndex !== undefined) setCurrentSectionIndex(sectionIndex);
+      } catch (e) {
+        console.error("Erro ao carregar progresso salvo:", e);
+      }
+    }
+  }, []);
+
+  // Persistence: Save to localStorage when state changes
+  useEffect(() => {
+    if (clienteSelecionado || modeloSelecionado || Object.keys(respostas).length > 0) {
+      localStorage.setItem("checklist_progress", JSON.stringify({
+        clienteId: clienteSelecionado,
+        modeloId: modeloSelecionado,
+        respostas,
+        sectionIndex: currentSectionIndex
+      }));
+    }
+  }, [clienteSelecionado, modeloSelecionado, respostas, currentSectionIndex]);
+
+  const clearProgress = () => {
+    localStorage.removeItem("checklist_progress");
+    setRespostas({});
+    setClienteSelecionado("");
+    setModeloSelecionado("");
+    setCurrentSectionIndex(0);
+  };
 
   useEffect(() => {
     fetchClientes();
@@ -669,9 +706,7 @@ const AplicarChecklist = () => {
       }
 
       toast.success("Checklist aplicado com sucesso!");
-      setRespostas({});
-      setClienteSelecionado("");
-      setModeloSelecionado("");
+      clearProgress();
       setAssinaturaRT("");
       setAssinaturaCliente("");
       setAssinaturaTestemunha("");
@@ -746,7 +781,10 @@ const AplicarChecklist = () => {
               <Label className="text-xs font-bold text-slate-500 uppercase ml-1">Modelo de Vistoria</Label>
               <Select
                 value={modelos.find(m => m.id === modeloSelecionado) ? { value: modeloSelecionado, label: modelos.find(m => m.id === modeloSelecionado)!.nome_modelo } : null}
-                onChange={(option) => setModeloSelecionado(option?.value || "")}
+                onChange={(option) => {
+                  setModeloSelecionado(option?.value || "");
+                  setCurrentSectionIndex(0);
+                }}
                 options={modelos.map(modelo => ({
                   value: modelo.id,
                   label: modelo.nome_modelo
@@ -758,6 +796,11 @@ const AplicarChecklist = () => {
               />
             </div>
           </div>
+          {(clienteSelecionado || modeloSelecionado) && (
+            <Button variant="ghost" size="sm" onClick={clearProgress} className="text-red-500 hover:text-red-600">
+              <X className="w-4 h-4 mr-2" /> Limpar Tudo
+            </Button>
+          )}
         </div>
 
         {clienteAtual && (
@@ -775,11 +818,7 @@ const AplicarChecklist = () => {
                 <div><span className="font-semibold">Endereço:</span> {[clienteAtual.rua, clienteAtual.bairro, clienteAtual.cidade, clienteAtual.estado].filter(Boolean).join(", ") || "Não informado"}</div>
                 <div><span className="font-semibold">Responsável Legal:</span> {clienteAtual.responsavel_legal || "Não informado"}</div>
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {modeloAtual && (
+                   {modeloAtual && (
           <div className="space-y-6">
             <Card className="shadow-md">
               <CardHeader>
@@ -788,16 +827,29 @@ const AplicarChecklist = () => {
               <CardContent className="space-y-8">
                 {!isReviewMode && (() => {
                   const secoes = modeloAtual.estrutura_json?.secoes || [];
-                  return secoes.map(secao => (
-                    <div key={secao.id} className="space-y-6">
-                      {secao.titulo && (
-                        <div className="border-b border-border pb-2">
-                          <h3 className="text-xl font-bold text-primary">{secao.titulo}</h3>
-                          {secao.descricao && <p className="text-sm text-muted-foreground mt-1">{secao.descricao}</p>}
+                  const activeSecao = secoes[currentSectionIndex];
+                  
+                  if (!activeSecao) return null;
+
+                  return (
+                    <div key={activeSecao.id} className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                      <div className="bg-primary/5 p-4 rounded-lg flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-primary uppercase tracking-tight">Seção {currentSectionIndex + 1} de {secoes.length}</p>
+                          <h3 className="text-xl font-bold text-slate-900 dark:text-white">{activeSecao.titulo}</h3>
                         </div>
-                      )}
-                      <div className="space-y-6 pl-2">
-                        {secao.campos?.map(campo => (
+                        <div className="h-2 w-32 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary transition-all duration-500" 
+                            style={{ width: `${((currentSectionIndex + 1) / secoes.length) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      
+                      {activeSecao.descricao && <p className="text-sm text-muted-foreground">{activeSecao.descricao}</p>}
+                      
+                      <div className="space-y-6">
+                        {activeSecao.campos?.map(campo => (
                           <div key={campo.id} className="space-y-2 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800">
                             {campo.tipo === "titulo" && <h4 className="text-lg font-semibold text-primary">{campo.label}</h4>}
                             {campo.tipo === "descricao" && <p className="text-muted-foreground italic">{campo.label}</p>}
@@ -812,11 +864,11 @@ const AplicarChecklist = () => {
                             {campo.tipo === "sim_nao_na" && (
                               <div className="space-y-3">
                                 <Label className="text-base font-semibold">{campo.label} {campo.obrigatorio && "*"}</Label>
-                                <RadioGroup value={respostas[campo.id] || ""} onValueChange={val => handleResposta(campo.id, val)} className="flex flex-wrap gap-4">
+                                <RadioGroup value={respostas[campo.id] || ""} onValueChange={val => handleResposta(campo.id, val)} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                   {["Sim", "Não", "N.A"].map(opt => (
-                                    <div key={opt} className="flex items-center space-x-2 bg-white dark:bg-slate-950 px-3 py-2 rounded-md border border-slate-200">
+                                    <div key={opt} className="flex items-center space-x-2 bg-white dark:bg-slate-950 px-3 py-3 rounded-md border border-slate-200 hover:border-primary transition-colors cursor-pointer group">
                                       <RadioGroupItem value={opt} id={`${campo.id}-${opt}`} />
-                                      <Label htmlFor={`${campo.id}-${opt}`} className="cursor-pointer">{opt}</Label>
+                                      <Label htmlFor={`${campo.id}-${opt}`} className="cursor-pointer flex-1 font-medium">{opt}</Label>
                                     </div>
                                   ))}
                                 </RadioGroup>
@@ -826,12 +878,12 @@ const AplicarChecklist = () => {
                             {campo.tipo === "multipla_escolha" && (
                               <div className="space-y-3">
                                 <Label className="text-base font-semibold">{campo.label} {campo.obrigatorio && "*"}</Label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                   {campo.opcoes?.map((opcao, idx) => {
                                     const isOutros = opcao === "Outros";
                                     return (
                                       <div key={idx} className="space-y-2">
-                                        <div className="flex items-center space-x-2 bg-white dark:bg-slate-950 px-3 py-2 rounded-md border border-slate-200">
+                                        <div className="flex items-center space-x-2 bg-white dark:bg-slate-950 px-3 py-3 rounded-md border border-slate-200 hover:border-primary transition-colors cursor-pointer">
                                           <Checkbox
                                             id={`${campo.id}-${idx}`}
                                             checked={respostas[campo.id]?.includes(opcao) || false}
@@ -841,7 +893,7 @@ const AplicarChecklist = () => {
                                               else handleResposta(campo.id, current.filter((v: string) => v !== opcao));
                                             }}
                                           />
-                                          <Label htmlFor={`${campo.id}-${idx}`} className="cursor-pointer">{opcao}</Label>
+                                          <Label htmlFor={`${campo.id}-${idx}`} className="cursor-pointer flex-1 font-medium">{opcao}</Label>
                                         </div>
                                         {isOutros && respostas[campo.id]?.includes("Outros") && (
                                           <Input
@@ -920,7 +972,7 @@ const AplicarChecklist = () => {
                         ))}
                       </div>
                     </div>
-                  ));
+                  );
                 })()}
 
                 {isReviewMode && (
@@ -957,7 +1009,7 @@ const AplicarChecklist = () => {
                                       <td className="p-3">
                                         {campo.tipo === "foto" ? (
                                           <div className="grid grid-cols-4 gap-1 w-full max-w-[200px]">
-                                            {resp?.map((u, i) => (
+                                            {resp?.map((u: string, i: number) => (
                                               <div key={i} className="relative aspect-square">
                                                 <img src={u} className="w-full h-full object-cover rounded border" />
                                                 <span className="absolute bottom-0 right-0 bg-black/60 text-[8px] text-white px-0.5 rounded-tl">{i + 1}</span>
@@ -965,7 +1017,17 @@ const AplicarChecklist = () => {
                                             ))}
                                           </div>
                                         ) : (
-                                          Array.isArray(resp) ? resp.join(", ") : (resp || "---")
+                                          <div className="space-y-1">
+                                            <div>
+                                              {Array.isArray(resp) ? resp.join(", ") : (resp || "---")}
+                                              {respostas[`${campo.id}_outros_text`] && ` (${respostas[`${campo.id}_outros_text`]})`}
+                                            </div>
+                                            {respostas[`${campo.id}_observacao`] && (
+                                              <div className="text-xs text-muted-foreground italic">
+                                                Obs: {respostas[`${campo.id}_observacao`]}
+                                              </div>
+                                            )}
+                                          </div>
                                         )}
                                       </td>
                                     </tr>
@@ -1019,17 +1081,42 @@ const AplicarChecklist = () => {
                 )}
 
                 {!isReviewMode && (
-                  <div className="pt-4 flex justify-end">
-                    <Button onClick={() => setIsReviewMode(true)} size="lg">Ir para Revisão<ArrowRight className="ml-2 h-4 w-4" /></Button>
+                  <div className="pt-6 flex justify-between border-t mt-8">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setCurrentSectionIndex(prev => Math.max(0, prev - 1))}
+                      disabled={currentSectionIndex === 0}
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" /> Anterior
+                    </Button>
+                    
+                    {currentSectionIndex < (modeloAtual.estrutura_json?.secoes?.length || 0) - 1 ? (
+                      <Button onClick={() => {
+                        setCurrentSectionIndex(prev => prev + 1);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}>
+                        Próxima Seção <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button onClick={() => {
+                        setIsReviewMode(true);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }} size="lg" className="bg-primary hover:bg-primary/90">
+                        Ir para Revisão <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
         )}
-      </div>
-    </Layout>
-  );
+      </CardContent>
+    </Card>
+  )}
+</div>
+</Layout>
+);
 };
 
 export default AplicarChecklist;
