@@ -113,35 +113,34 @@ const Auth = () => {
   };
 
   return <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50/50 dark:from-slate-950 dark:to-slate-900 p-4">
-    {/* Brand Visual Identity - Premium Composition */}
-    <div className="flex flex-col items-center mb-10">
-      <div className="relative flex items-center justify-center w-20 h-20 mb-5 group">
-        {/* Sombra de Brilho Dinâmica */}
-        <div className="absolute inset-0 bg-primary opacity-20 blur-xl rounded-full group-hover:opacity-30 transition-opacity duration-500"></div>
-
-        {/* Container do Ícone - Ampliado e sem bordas brancas */}
-        <div className="relative flex items-center justify-center w-24 h-24 mb-6 transition-transform hover:scale-105 duration-300">
-          <img src="/logo.png" alt="RT Expert Logo" className="w-full h-full object-contain drop-shadow-2xl" />
-        </div>
-
-        {/* Elemento Extra (Notificação de Sucesso/Brilho) */}
-        <div className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-teal-400 border-[2.5px] border-slate-50 dark:border-slate-950 rounded-full flex items-center justify-center shadow-md z-10 hover:scale-110 transition-transform cursor-default">
-          <Sparkles className="w-[10px] h-[10px] text-teal-950 fill-teal-950" />
-        </div>
-      </div>
-
-      <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
-        RT<span className="text-primary font-light">Expert</span>
-      </h1>
-
-      <p className="mt-1.5 font-bold text-[0.65rem] text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] relative flex items-center gap-2">
-        <span className="w-4 h-px bg-slate-300 dark:bg-slate-700"></span>
-        Gestão Inteligente
-        <span className="w-4 h-px bg-slate-300 dark:bg-slate-700"></span>
-      </p>
-    </div>
-
     <Card className="w-full max-w-md shadow-lg border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 overflow-hidden">
+      {/* Brand Visual Identity - Premium Composition */}
+      <div className="flex flex-col items-center pt-8 pb-2">
+        <div className="relative flex items-center justify-center w-20 h-20 mb-5 group">
+          {/* Sombra de Brilho Dinâmica */}
+          <div className="absolute inset-0 bg-primary opacity-20 blur-xl rounded-full group-hover:opacity-30 transition-opacity duration-500"></div>
+
+          {/* Container do Ícone - Ampliado e sem bordas brancas */}
+          <div className="relative flex items-center justify-center w-24 h-24 mb-6 transition-transform hover:scale-105 duration-300">
+            <img src="/logo.png" alt="RT Expert Logo" className="w-full h-full object-contain drop-shadow-2xl" />
+          </div>
+
+          {/* Elemento Extra (Notificação de Sucesso/Brilho) */}
+          <div className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-teal-400 border-[2.5px] border-slate-50 dark:border-slate-950 rounded-full flex items-center justify-center shadow-md z-10 hover:scale-110 transition-transform cursor-default">
+            <Sparkles className="w-[10px] h-[10px] text-teal-950 fill-teal-950" />
+          </div>
+        </div>
+
+        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
+          RT<span className="text-primary font-light">Expert</span>
+        </h1>
+
+        <p className="mt-1.5 font-bold text-[0.65rem] text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] relative flex items-center gap-2">
+          <span className="w-4 h-px bg-slate-300 dark:bg-slate-700"></span>
+          Gestão Inteligente
+          <span className="w-4 h-px bg-slate-300 dark:bg-slate-700"></span>
+        </p>
+      </div>
       <Tabs defaultValue="login" className="w-full">
         <CardHeader className="p-6 pb-2">
           <TabsList className="grid w-full grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl">
