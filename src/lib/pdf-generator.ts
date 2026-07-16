@@ -387,9 +387,9 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
     const rowBlockHeight = cellHeight + captionHeight + 4;
 
     // Continua na mesma página se couber o título + 1 linha de fotos
-    ensureSpace(16 + rowBlockHeight);
+    const brokeForPhotos = ensureSpace(24 + rowBlockHeight);
+    if (!brokeForPhotos) yPos += 12; // respiro em relação ao bloco anterior
 
-    yPos += 4;
     pdf.setFontSize(14);
     pdf.setFont("helvetica", "bold");
     pdf.text("Arquivo Fotográfico", margin, yPos);
@@ -493,12 +493,13 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
   // ---------- Assinaturas ----------
 
   if (assinaturaRT || assinaturaCliente || assinaturaTestemunha) {
-    if (yPos + 45 > contentBottom) {
+    // Assinaturas sempre ancoradas no rodapé da última página
+    const signatureBlockHeight = 32;
+    const targetY = contentBottom - signatureBlockHeight;
+    if (yPos > targetY) {
       newPage();
-      yPos += 8;
-    } else {
-      yPos += 10;
     }
+    yPos = targetY;
 
     const signatureWidth = 50;
     const signatureHeight = 18;
