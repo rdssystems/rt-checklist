@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import SignedPhoto from "@/components/SignedPhoto";
 import type { ChecklistPronto } from "@/types";
 
 const ChecklistsProntos = () => {
@@ -467,10 +468,15 @@ const ChecklistsProntos = () => {
                                   respostaText = (
                                     <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 gap-2 mt-1">
                                       {resposta.map((url, idx) => (
-                                        <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="relative group">
-                                          <img src={url} alt={`Evidência ${idx + 1}`} className="aspect-square w-full object-cover rounded border shadow-sm group-hover:opacity-80 transition-opacity" />
+                                        <div key={idx} className="relative group">
+                                          <SignedPhoto
+                                            stored={url}
+                                            openOnClick
+                                            alt={`Evidência ${idx + 1}`}
+                                            className="aspect-square w-full object-cover rounded border shadow-sm group-hover:opacity-80 transition-opacity"
+                                          />
                                           <span className="absolute bottom-0 right-0 bg-black/60 text-[8px] text-white px-1 rounded-tl">{idx + 1}</span>
-                                        </a>
+                                        </div>
                                       ))}
                                     </div>
                                   );

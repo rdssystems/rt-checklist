@@ -14,6 +14,8 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nomeRT, setNomeRT] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [aceitouTermos, setAceitouTermos] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [isResetting, setIsResetting] = useState(false);
 
@@ -45,6 +47,18 @@ const Auth = () => {
       toast.error("Preencha todos os campos");
       return;
     }
+    if (password !== confirmarSenha) {
+      toast.error("As senhas não coincidem");
+      return;
+    }
+    if (password.length < 6) {
+      toast.error("A senha deve ter no mínimo 6 caracteres");
+      return;
+    }
+    if (!aceitouTermos) {
+      toast.error("É necessário aceitar os Termos de Uso e a Política de Privacidade");
+      return;
+    }
     setLoading(true);
     const {
       error
@@ -56,7 +70,8 @@ const Auth = () => {
         data: {
           nome_rt: nomeRT,
           plan_type: 'premium',
-          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          terms_accepted_at: new Date().toISOString()
         }
       }
     });
@@ -254,6 +269,46 @@ const Auth = () => {
                         className="h-12 rounded-none border-[#0E2A47]/25 bg-white font-plex text-base focus-visible:ring-[#0E2A47]"
                       />
                     </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="confirmar-senha" className="font-plex-mono text-xs uppercase tracking-wider text-[#5A6B7E]">
+                        Confirme a senha
+                      </Label>
+                      <Input
+                        id="confirmar-senha"
+                        type="password"
+                        placeholder="Repita a senha"
+                        value={confirmarSenha}
+                        onChange={e => setConfirmarSenha(e.target.value)}
+                        required
+                        className={`h-12 rounded-none bg-white font-plex text-base focus-visible:ring-[#0E2A47] ${
+                          confirmarSenha && confirmarSenha !== password
+                            ? "border-red-400"
+                            : "border-[#0E2A47]/25"
+                        }`}
+                      />
+                      {confirmarSenha && confirmarSenha !== password && (
+                        <p className="font-plex text-xs text-red-500">As senhas não coincidem</p>
+                      )}
+                    </div>
+                    <label className="flex items-start gap-2.5 pt-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={aceitouTermos}
+                        onChange={e => setAceitouTermos(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[#0E2A47]"
+                      />
+                      <span className="font-plex text-xs leading-relaxed text-[#5A6B7E]">
+                        Li e aceito os{" "}
+                        <a href="/termos" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#0E2A47] underline">
+                          Termos de Uso
+                        </a>{" "}
+                        e a{" "}
+                        <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#0E2A47] underline">
+                          Política de Privacidade
+                        </a>{" "}
+                        (LGPD)
+                      </span>
+                    </label>
                   </CardContent>
                   <CardFooter className="p-6 pt-0">
                     <Button

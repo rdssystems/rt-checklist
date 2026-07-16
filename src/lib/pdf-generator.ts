@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import { Cliente, CampoChecklist } from "@/types";
+import { signPhotoUrls } from "@/lib/photo-utils";
 
 export interface PDFGeneratorOptions {
   logoUrl?: string;
@@ -295,6 +296,12 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
   });
 
   if (allPhotos.length > 0) {
+    // Bucket privado: converte para URLs assinadas antes de embutir no PDF
+    const signedUrls = await signPhotoUrls(allPhotos.map((p) => p.url));
+    allPhotos.forEach((p, i) => {
+      p.url = signedUrls[i];
+    });
+
     pdf.addPage();
     yPos = margin;
     pdf.setFontSize(16);

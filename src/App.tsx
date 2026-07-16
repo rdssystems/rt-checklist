@@ -14,6 +14,8 @@ import AplicarChecklist from "./pages/AplicarChecklist";
 import ChecklistsProntos from "./pages/ChecklistsProntos";
 import Visitas from "./pages/Visitas";
 import Upgrade from "./pages/Upgrade";
+import TermosDeUso from "./pages/TermosDeUso";
+import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +38,8 @@ const App = () => (
               <Route path="/checklists-prontos" element={<ChecklistsProntos />} />
               <Route path="/visitas" element={<Visitas />} />
               <Route path="/upgrade" element={<Upgrade />} />
+              <Route path="/termos" element={<TermosDeUso />} />
+              <Route path="/privacidade" element={<PoliticaPrivacidade />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

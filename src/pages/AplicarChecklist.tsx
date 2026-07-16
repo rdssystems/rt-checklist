@@ -14,6 +14,7 @@ import { FileCheck, Building2, Save, FileDown, ArrowRight, ArrowLeft, Camera, X,
 import { toast } from "sonner";
 import { compressImage } from "@/lib/image-utils";
 import { toTitleCase, toSentenceCase } from "@/lib/text-utils";
+import SignedPhoto from "@/components/SignedPhoto";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { gerarPDFInspecao } from "@/lib/pdf-generator";
 import customSelectStyles from "@/components/select-styles";
@@ -535,7 +536,7 @@ const AplicarChecklist = () => {
                                       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
                                         {respostas[campo.id]?.map((url: string, idx: number) => (
                                           <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200">
-                                            <img src={url} alt="Evidência" className="w-full h-full object-cover" />
+                                            <SignedPhoto stored={url} alt="Evidência" className="w-full h-full object-cover" />
                                             <button onClick={() => removeImage(campo.id, url)} className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-bl-lg shadow-sm">
                                               <X className="w-3 h-3" />
                                             </button>

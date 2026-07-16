@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, Building2, Image as ImageIcon, User, Mail, ShieldCheck, Save, Calendar, CheckCircle2, AlertTriangle, Trash2 } from "lucide-react";
+import { Upload, Building2, Image as ImageIcon, User, Mail, ShieldCheck, Save, Calendar, CheckCircle2, AlertTriangle, Trash2, Download } from "lucide-react";
 import { compressImage } from "@/lib/image-utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toTitleCase } from "@/lib/text-utils";
@@ -36,8 +36,60 @@ const Settings = () => {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const DELETE_CONFIRMATION = "EXCLUIRMINHACONTA";
+
+  // LGPD Art. 18, II e V — acesso e portabilidade dos dados
+  const handleExportData = async () => {
+    setExporting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const [profile, clientes, modelos, aplicacoes, agendamentos] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+        supabase.from("clientes").select("*").eq("tenant_id", user.id),
+        supabase.from("modelos_checklist").select("*").eq("tenant_id", user.id),
+        supabase.from("aplicacoes_checklist").select("*").eq("tenant_id", user.id),
+        supabase.from("agendamentos").select("*").eq("tenant_id", user.id),
+      ]);
+
+      // Tokens do Google não entram na exportação por segurança
+      const perfilExportado = profile.data ? { ...(profile.data as any) } : null;
+      if (perfilExportado) {
+        delete perfilExportado.google_access_token;
+        delete perfilExportado.google_refresh_token;
+        delete perfilExportado.google_token_expiry;
+      }
+
+      const exportPayload = {
+        exportado_em: new Date().toISOString(),
+        formato: "RT Expert - Exportação LGPD (Art. 18)",
+        conta: { id: user.id, email: user.email, criada_em: user.created_at },
+        perfil: perfilExportado,
+        clientes: clientes.data || [],
+        modelos_checklist: modelos.data || [],
+        checklists_aplicados: aplicacoes.data || [],
+        agendamentos: agendamentos.data || [],
+      };
+
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `rt-expert-meus-dados-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast.success("Dados exportados com sucesso!");
+    } catch (error) {
+      console.error("Erro ao exportar dados:", error);
+      toast.error("Erro ao exportar seus dados. Tente novamente.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     loadSettings();
@@ -548,6 +600,45 @@ const Settings = () => {
                     : "Você será redirecionado para a página de autorização segura do Google."}
                 </p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* PRIVACIDADE E DADOS (LGPD) */}
+        <Card className="mt-6 border-primary/10 shadow-sm overflow-hidden">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-primary" />
+              Privacidade e Dados (LGPD)
+            </CardTitle>
+            <CardDescription>
+              Conforme a Lei Geral de Proteção de Dados, você pode obter uma cópia de todos os seus dados.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 p-4">
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                <p className="font-semibold text-slate-900 dark:text-white mb-1">Exportar meus dados</p>
+                <p>
+                  Baixa um arquivo JSON com seu perfil, clientes, modelos, checklists aplicados e agendamentos
+                  (portabilidade — Art. 18).
+                </p>
+                <p className="mt-2 text-xs">
+                  Consulte também os{" "}
+                  <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-primary underline">Termos de Uso</a>{" "}
+                  e a{" "}
+                  <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="text-primary underline">Política de Privacidade</a>.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="shrink-0 h-11"
+                onClick={handleExportData}
+                disabled={exporting}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {exporting ? "Exportando..." : "Exportar Dados"}
+              </Button>
             </div>
           </CardContent>
         </Card>
