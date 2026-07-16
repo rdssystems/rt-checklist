@@ -159,6 +159,21 @@ const AplicarChecklist = () => {
     }));
   };
 
+  // Conta todas as fotos já anexadas nos campos de foto deste checklist
+  const contarFotosDoChecklist = (): number => {
+    const secoesModelo = modeloAtual?.estrutura_json?.secoes
+      || (modeloAtual?.estrutura_json?.campos ? [{ campos: modeloAtual.estrutura_json.campos }] : []);
+    let total = 0;
+    secoesModelo.forEach((s: any) => {
+      s.campos?.forEach((c: any) => {
+        if (c.tipo === "foto" && Array.isArray(respostas[c.id])) {
+          total += respostas[c.id].length;
+        }
+      });
+    });
+    return total;
+  };
+
   const handleImageUpload = async (campoId: string, eventOrBlob: React.ChangeEvent<HTMLInputElement> | Blob) => {
     let files: FileList | null = null;
     let singleBlob: Blob | null = null;
@@ -173,18 +188,40 @@ const AplicarChecklist = () => {
     if ((!files || files.length === 0) && !singleBlob) return;
     if (!user) return;
 
+    // Limite de fotos por checklist conforme o plano (free: 5 / premium: 10)
+    const { getPlanStatus } = await import("@/lib/plan-limits");
+    const planStatus = await getPlanStatus();
+    const maxFotos = planStatus.isPremium ? 10 : 5;
+    const fotosAtuais = contarFotosDoChecklist();
+    const slotsRestantes = maxFotos - fotosAtuais;
+
+    if (slotsRestantes <= 0) {
+      toast.error(
+        planStatus.isPremium
+          ? `Limite de ${maxFotos} fotos por checklist atingido.`
+          : `Limite de ${maxFotos} fotos por checklist no plano Free. Faça upgrade para anexar até 10.`
+      );
+      return;
+    }
+
     setUploadingFields(prev => ({ ...prev, [campoId]: true }));
 
     try {
       const newUrls = [...(respostas[campoId] || [])];
-      const itemsToProcess = files ? Array.from(files) : [singleBlob as Blob];
+      let itemsToProcess = files ? Array.from(files) : [singleBlob as Blob];
+
+      if (itemsToProcess.length > slotsRestantes) {
+        itemsToProcess = itemsToProcess.slice(0, slotsRestantes);
+        toast.warning(`Apenas ${slotsRestantes} foto(s) adicionada(s) — limite de ${maxFotos} por checklist.`);
+      }
 
       for (let i = 0; i < itemsToProcess.length; i++) {
         const item = itemsToProcess[i];
 
+        // Free comprime mais para economizar armazenamento
         const compressedBlob = await compressImage(item as File | Blob, {
-          maxWidth: 1024,
-          quality: 0.7
+          maxWidth: planStatus.isPremium ? 1024 : 800,
+          quality: planStatus.isPremium ? 0.7 : 0.6
         });
 
         const fileExt = "jpg";
