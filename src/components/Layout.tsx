@@ -41,16 +41,37 @@ interface LayoutProps {
   children: ReactNode;
 }
 
+// Cache local do perfil: evita o "pisca" da marca padrão a cada troca de página,
+// já que o Layout é remontado em toda navegação e o perfil vem do banco de forma assíncrona.
+const PROFILE_CACHE_KEY = "rt_profile_cache";
+
+interface CachedProfile {
+  companyName: string;
+  logoUrl: string;
+  userName: string;
+  avatarUrl: string;
+  planStatus: { isPremium: boolean; planType: string; daysLeft: number } | null;
+}
+
+const readProfileCache = (): CachedProfile | null => {
+  try {
+    return JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) || "null");
+  } catch {
+    return null;
+  }
+};
+
 const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [companyName, setCompanyName] = useState("RT-Expert");
-  const [logoUrl, setLogoUrl] = useState("");
-  const [userName, setUserName] = useState("Usuário");
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [planStatus, setPlanStatus] = useState<{ isPremium: boolean; planType: string; daysLeft: number } | null>(null);
+  const [cached] = useState(readProfileCache);
+  const [companyName, setCompanyName] = useState(cached?.companyName || "RT-Expert");
+  const [logoUrl, setLogoUrl] = useState(cached?.logoUrl || "");
+  const [userName, setUserName] = useState(cached?.userName || "Usuário");
+  const [avatarUrl, setAvatarUrl] = useState(cached?.avatarUrl || "");
+  const [planStatus, setPlanStatus] = useState<{ isPremium: boolean; planType: string; daysLeft: number } | null>(cached?.planStatus || null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -65,6 +86,7 @@ const Layout = ({ children }: LayoutProps) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       if (!session && event === "SIGNED_OUT") {
+        localStorage.removeItem(PROFILE_CACHE_KEY);
         navigate("/auth");
       } else if (session) {
         loadSettings(session.user.id);
@@ -84,21 +106,34 @@ const Layout = ({ children }: LayoutProps) => {
     const profileData = data as any;
 
     if (profileData) {
-      setCompanyName(profileData.company_name || "RT-Expert");
-      setLogoUrl(profileData.logo_url || "");
-      setUserName(profileData.nome_rt || "Usuário");
-      setAvatarUrl(profileData.avatar_url || "");
-      
       const now = new Date();
       const trialEnds = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
       const trialActive = trialEnds ? trialEnds > now : false;
       const daysLeft = trialEnds ? Math.max(0, Math.ceil((trialEnds.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : 0;
-      
-      setPlanStatus({
-        isPremium: profileData.plan_type === 'premium' || profileData.plan_type === 'expert' || trialActive,
-        planType: profileData.plan_type || 'free',
-        daysLeft
-      });
+
+      const fresh: CachedProfile = {
+        companyName: profileData.company_name || "RT-Expert",
+        logoUrl: profileData.logo_url || "",
+        userName: profileData.nome_rt || "Usuário",
+        avatarUrl: profileData.avatar_url || "",
+        planStatus: {
+          isPremium: profileData.plan_type === 'premium' || profileData.plan_type === 'expert' || trialActive,
+          planType: profileData.plan_type || 'free',
+          daysLeft
+        }
+      };
+
+      setCompanyName(fresh.companyName);
+      setLogoUrl(fresh.logoUrl);
+      setUserName(fresh.userName);
+      setAvatarUrl(fresh.avatarUrl);
+      setPlanStatus(fresh.planStatus);
+
+      try {
+        localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(fresh));
+      } catch {
+        // storage cheio/indisponível: segue sem cache
+      }
     }
   };
 
@@ -107,6 +142,7 @@ const Layout = ({ children }: LayoutProps) => {
     if (error) {
       toast.error("Erro ao sair");
     } else {
+      localStorage.removeItem(PROFILE_CACHE_KEY);
       toast.success("Logout realizado com sucesso!");
     }
   };
