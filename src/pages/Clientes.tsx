@@ -10,25 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Pencil, Trash2, Building2, MapPin, Info, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
-interface Cliente {
-  id: string;
-  razao_social: string;
-  nome_fantasia: string | null;
-  cnpj: string;
-  cep: string | null;
-  rua: string | null;
-  numero?: string | null;
-  bairro: string | null;
-  cidade: string | null;
-  estado: string | null;
-  telefone: string | null;
-  email_cliente: string | null;
-  responsavel_legal: string | null;
-  cpf_responsavel: string | null;
-  latitude: number | null;
-  longitude: number | null;
-}
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { toTitleCase } from "@/lib/text-utils";
+import type { Cliente } from "@/types";
 
 const Clientes = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -40,6 +24,7 @@ const Clientes = () => {
   const [loading, setLoading] = useState(false);
   const [geocodeConfirmOpen, setGeocodeConfirmOpen] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchClientes();
@@ -52,7 +37,7 @@ const Clientes = () => {
       if (profile) {
         const now = new Date();
         const trialEnds = profile.trial_ends_at ? new Date(profile.trial_ends_at) : null;
-        setIsPremium(profile.plan_type === 'premium' || (trialEnds ? trialEnds > now : false));
+        setIsPremium(profile.plan_type === 'premium' || profile.plan_type === 'expert' || (trialEnds ? trialEnds > now : false));
       }
     }
 
@@ -226,7 +211,14 @@ const Clientes = () => {
     const dataToSave: any = {
       ...formData,
       tenant_id: user.id,
-      razao_social: formData.razao_social!,
+      razao_social: toTitleCase(formData.razao_social!),
+      nome_fantasia: formData.nome_fantasia ? toTitleCase(formData.nome_fantasia) : formData.nome_fantasia,
+      responsavel_legal: formData.responsavel_legal ? toTitleCase(formData.responsavel_legal) : formData.responsavel_legal,
+      rua: formData.rua ? toTitleCase(formData.rua) : formData.rua,
+      bairro: formData.bairro ? toTitleCase(formData.bairro) : formData.bairro,
+      cidade: formData.cidade ? toTitleCase(formData.cidade) : formData.cidade,
+      estado: formData.estado ? formData.estado.trim().toUpperCase() : formData.estado,
+      email_cliente: formData.email_cliente ? formData.email_cliente.trim().toLowerCase() : formData.email_cliente,
       cnpj: formData.cnpj!,
       latitude,
       longitude,
@@ -250,8 +242,6 @@ const Clientes = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Deseja realmente excluir este cliente?")) return;
-
     const { error } = await supabase.from("clientes").delete().eq("id", id);
 
     if (error) {
@@ -681,38 +671,99 @@ const Clientes = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {/* Mobile/tablet: lista em 2 linhas por cliente */}
+            <div className="lg:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {clientes.map((cliente) => (
+                <div key={cliente.id} className="flex items-center justify-between gap-2 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-2 h-2 shrink-0 rounded-full ${cliente.latitude && cliente.longitude ? 'bg-emerald-500' : 'bg-red-500'}`}
+                        title={cliente.latitude && cliente.longitude ? 'Coordenadas configuradas' : 'Sem coordenadas'}
+                      />
+                      <span className="font-medium text-sm truncate text-slate-900 dark:text-white">
+                        {cliente.nome_fantasia || cliente.razao_social}
+                      </span>
+                    </div>
+                    <div className="mt-1 pl-4 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      <span className="whitespace-nowrap">{formatCNPJ(cliente.cnpj)}</span>
+                      {cliente.telefone && <span className="whitespace-nowrap">{formatTelefone(cliente.telefone)}</span>}
+                      {cliente.cidade && (
+                        <span className="whitespace-nowrap">
+                          {cliente.cidade}{cliente.estado ? `/${cliente.estado}` : ""}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => openViewDialog(cliente)}
+                      title="Visualizar Detalhes"
+                    >
+                      <Eye className="w-4 h-4 text-blue-600" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => openDialog(cliente)}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteId(cliente.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {clientes.length === 0 && (
+                <p className="text-center text-muted-foreground py-8 text-sm">
+                  Nenhum cliente cadastrado. Clique em "Novo Cliente" para começar.
+                </p>
+              )}
+            </div>
+
+            {/* Desktop: tabela completa */}
+            <div className="hidden lg:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="px-2 sm:px-4">Nome / Razão Social</TableHead>
-                    <TableHead className="px-2 sm:px-4">CNPJ</TableHead>
-                    <TableHead className="hidden md:table-cell">Telefone</TableHead>
-                    <TableHead className="text-right px-2 sm:px-4">Ações</TableHead>
+                    <TableHead>Nome / Razão Social</TableHead>
+                    <TableHead>CNPJ</TableHead>
+                    <TableHead>Telefone</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {clientes.map((cliente) => (
                     <TableRow key={cliente.id}>
-                      <TableCell className="font-medium px-2 sm:px-4 max-w-[120px] sm:max-w-none truncate text-xs sm:text-sm">
+                      <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <span 
-                            className={`w-2 h-2 shrink-0 rounded-full ${cliente.latitude && cliente.longitude ? 'bg-emerald-500' : 'bg-red-500'}`} 
+                          <span
+                            className={`w-2 h-2 shrink-0 rounded-full ${cliente.latitude && cliente.longitude ? 'bg-emerald-500' : 'bg-red-500'}`}
                             title={cliente.latitude && cliente.longitude ? 'Coordenadas configuradas' : 'Sem coordenadas'}
                           />
                           <span className="truncate">{cliente.nome_fantasia || cliente.razao_social}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="px-2 sm:px-4 text-[10px] sm:text-sm whitespace-nowrap">
+                      <TableCell className="whitespace-nowrap">
                         {formatCNPJ(cliente.cnpj)}
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">{formatTelefone(cliente.telefone)}</TableCell>
-                      <TableCell className="text-right px-2 sm:px-4 whitespace-nowrap">
-                        <div className="flex justify-end gap-1 sm:gap-2">
+                      <TableCell>{formatTelefone(cliente.telefone)}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <div className="flex justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 sm:h-9 sm:w-9"
+                            className="h-9 w-9"
                             onClick={() => openViewDialog(cliente)}
                             title="Visualizar Detalhes"
                           >
@@ -721,7 +772,7 @@ const Clientes = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 sm:h-9 sm:w-9"
+                            className="h-9 w-9"
                             onClick={() => openDialog(cliente)}
                           >
                             <Pencil className="w-4 h-4" />
@@ -729,8 +780,8 @@ const Clientes = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 sm:h-9 sm:w-9 text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(cliente.id)}
+                            className="h-9 w-9 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteId(cliente.id)}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -740,7 +791,7 @@ const Clientes = () => {
                   ))}
                   {clientes.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                         Nenhum cliente cadastrado. Clique em "Novo Cliente" para começar.
                       </TableCell>
                     </TableRow>
@@ -750,6 +801,19 @@ const Clientes = () => {
             </div>
           </CardContent>
         </Card>
+
+        <ConfirmDialog
+          open={!!deleteId}
+          onOpenChange={(open) => { if (!open) setDeleteId(null); }}
+          title="Excluir cliente?"
+          description="Esta ação não pode ser desfeita. Os dados do cliente serão removidos permanentemente."
+          confirmLabel="Excluir"
+          destructive
+          onConfirm={() => {
+            if (deleteId) handleDelete(deleteId);
+            setDeleteId(null);
+          }}
+        />
       </div>
     </Layout>
   );

@@ -4,8 +4,26 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, ClipboardList, Save, Edit3, Settings, GripVertical, BoxSelect, ToggleLeft, CalendarDays, List, ImageIcon, Type, Copy, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ClipboardList, Save, Edit3, Settings, ArrowLeft, BoxSelect, ToggleLeft, CalendarDays, List, ImageIcon, Type, Copy, ChevronUp, ChevronDown } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { toTitleCase, toSentenceCase } from "@/lib/text-utils";
 import { toast } from "sonner";
+
+// Breakpoint em que o editor troca das 3 colunas fixas para o layout mobile (toolbar + sheet)
+const useIsCompact = () => {
+  const [compact, setCompact] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches
+  );
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 1023px)");
+    const onChange = () => setCompact(mql.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return compact;
+};
 
 type FieldType = "texto" | "sim_nao_na" | "observacao" | "foto" | "multipla_escolha" | "data" | "outros";
 
@@ -29,7 +47,7 @@ interface Secao {
 interface Modelo {
   id: string;
   nome_modelo: string;
-  estrutura_json: { secoes?: Secao[]; campos?: FieldItem[] };
+  estrutura_json: { secoes?: Secao[]; campos?: FieldItem[]; descricao?: string };
   created_at: string;
 }
 
@@ -47,6 +65,11 @@ const ChecklistDesigner = () => {
   // Selection
   const [activeSecaoId, setActiveSecaoId] = useState<string | null>(null);
   const [activeCampoId, setActiveCampoId] = useState<string | null>(null);
+
+  // Confirmation dialogs
+  const [deleteModeloId, setDeleteModeloId] = useState<string | null>(null);
+  const [deleteSecaoId, setDeleteSecaoId] = useState<string | null>(null);
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
 
   useEffect(() => {
     fetchModelos();
@@ -69,6 +92,7 @@ const ChecklistDesigner = () => {
     if (modelo) {
       setEditingId(modelo.id);
       setNomeModelo(modelo.nome_modelo);
+      setDescricaoModelo(modelo.estrutura_json.descricao || "");
 
       // Migration from old un-sectioned layout to new one
       const json = modelo.estrutura_json;
@@ -92,6 +116,7 @@ const ChecklistDesigner = () => {
     } else {
       setEditingId(null);
       setNomeModelo("Novo Modelo de Inspeção");
+      setDescricaoModelo("");
       const id = crypto.randomUUID();
       setSecoes([{ id, titulo: "Nova Seção", campos: [] }]);
       setActiveSecaoId(id);
@@ -220,9 +245,20 @@ const ChecklistDesigner = () => {
       return;
     }
 
+    // Normaliza textos para evitar cadastros em caixa alta
+    const secoesNormalizadas = secoes.map((s) => ({
+      ...s,
+      titulo: toTitleCase(s.titulo),
+      campos: s.campos.map((c) => ({
+        ...c,
+        label: toSentenceCase(c.label),
+        opcoes: c.opcoes?.map((op) => toSentenceCase(op)),
+      })),
+    }));
+
     const dataToSave: any = {
-      nome_modelo: nomeModelo,
-      estrutura_json: { secoes },
+      nome_modelo: toTitleCase(nomeModelo),
+      estrutura_json: { secoes: secoesNormalizadas, descricao: toSentenceCase(descricaoModelo) },
       tenant_id: user.id,
     };
 
@@ -242,7 +278,6 @@ const ChecklistDesigner = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Deseja realmente excluir este modelo?")) return;
     const { error } = await supabase.from("modelos_checklist").delete().eq("id", id);
     if (error) {
       toast.error("Erro ao excluir modelo");
@@ -252,7 +287,106 @@ const ChecklistDesigner = () => {
     }
   };
 
+  const handleExit = () => {
+    setExitConfirmOpen(true);
+  };
+
   const activeField = getActiveField();
+  const isCompact = useIsCompact();
+  const isMobile = useIsMobile();
+
+  const getActiveFieldSecaoId = () => {
+    if (!activeCampoId) return null;
+    const secao = secoes.find(s => s.campos.some(c => c.id === activeCampoId));
+    return secao?.id || null;
+  };
+
+  const renderFieldProperties = (field: FieldItem) => (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Título da Pergunta (Label)</label>
+        <textarea
+          className="w-full rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-800 text-sm focus:border-primary focus:ring-primary outline-none p-3"
+          rows={3}
+          value={field.label}
+          onChange={(e) => updateCampo(field.id, { label: e.target.value })}
+        />
+      </div>
+
+      {(field.tipo === "texto" || field.tipo === "outros") && (
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Texto de Placeholder</label>
+          <input
+            className="w-full rounded-lg border border-slate-200 dark:border-slate-800 dark:bg-slate-800 text-sm focus:border-primary focus:ring-primary outline-none p-3"
+            type="text"
+            value={field.placeholder || ""}
+            onChange={(e) => updateCampo(field.id, { placeholder: e.target.value })}
+          />
+        </div>
+      )}
+
+      {field.tipo === "multipla_escolha" && (
+        <div className="space-y-3 pt-2">
+          <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Opções de Resposta</label>
+          {field.opcoes?.map((op, idx) => (
+            <div key={idx} className="flex gap-2">
+              <input
+                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 text-sm p-2 outline-none"
+                value={op}
+                onChange={(e) => {
+                  const newOps = [...(field.opcoes || [])];
+                  newOps[idx] = e.target.value;
+                  updateCampo(field.id, { opcoes: newOps });
+                }}
+              />
+              <button
+                onClick={() => {
+                  const newOps = field.opcoes?.filter((_, i) => i !== idx);
+                  updateCampo(field.id, { opcoes: newOps });
+                }}
+                className="p-2 text-slate-400 hover:text-red-500"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => {
+              const newOps = [...(field.opcoes || []), `Nova Opção ${(field.opcoes?.length || 0) + 1}`];
+              updateCampo(field.id, { opcoes: newOps });
+            }}
+            className="text-xs font-bold text-primary flex items-center gap-1 mt-2"
+          >
+            <Plus className="w-3 h-3" /> Adicionar Opção
+          </button>
+        </div>
+      )}
+
+      <div className="pt-4 space-y-4 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Resposta Obrigatória</label>
+          <button
+            onClick={() => updateCampo(field.id, { obrigatorio: !field.obrigatorio })}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${field.obrigatorio ? "bg-primary" : "bg-slate-200 dark:bg-slate-700"}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${field.obrigatorio ? "translate-x-6" : "translate-x-1"}`}></span>
+          </button>
+        </div>
+
+        {field.tipo === "multipla_escolha" && (
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Habilitar Observação</label>
+            <button
+              onClick={() => updateCampo(field.id, { tem_observacao: !field.tem_observacao })}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${field.tem_observacao ? "bg-primary" : "bg-slate-200 dark:bg-slate-700"}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${field.tem_observacao ? "translate-x-6" : "translate-x-1"}`}></span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   if (!editingMode) {
     return (
@@ -299,7 +433,7 @@ const ChecklistDesigner = () => {
                           <Button variant="ghost" size="sm" onClick={() => openEditor(modelo)} className="text-slate-600 hover:text-primary">
                             <Edit3 className="w-4 h-4 mr-2" /> Editar
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(modelo.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
+                          <Button variant="ghost" size="sm" onClick={() => setDeleteModeloId(modelo.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </TableCell>
@@ -317,6 +451,19 @@ const ChecklistDesigner = () => {
               </Table>
             </div>
           </div>
+
+          <ConfirmDialog
+            open={!!deleteModeloId}
+            onOpenChange={(open) => { if (!open) setDeleteModeloId(null); }}
+            title="Excluir modelo?"
+            description="Esta ação não pode ser desfeita. O modelo de checklist será removido permanentemente."
+            confirmLabel="Excluir"
+            destructive
+            onConfirm={() => {
+              if (deleteModeloId) handleDelete(deleteModeloId);
+              setDeleteModeloId(null);
+            }}
+          />
         </div>
       </Layout>
     );
@@ -325,33 +472,34 @@ const ChecklistDesigner = () => {
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
       {/* Studio Header */}
-      <header className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-3 shrink-0 z-10">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setEditingMode(false)} className="mr-2">
-            <Trash2 className="w-5 h-5 text-slate-400" /> {/* Should be back arrow, replacing with Save for now */}
+      <header className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 md:px-6 py-3 shrink-0 z-10">
+        <div className="flex items-center gap-2 md:gap-4 min-w-0">
+          <Button variant="ghost" size="icon" onClick={handleExit} className="shrink-0">
+            <ArrowLeft className="w-5 h-5 text-slate-500" />
           </Button>
-          <div className="text-primary flex items-center justify-center p-2 bg-primary/10 rounded-lg">
+          <div className="text-primary hidden sm:flex items-center justify-center p-2 bg-primary/10 rounded-lg shrink-0">
             <BoxSelect className="w-6 h-6" />
           </div>
-          <div className="flex flex-col">
-            <h2 className="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-tight">RT-Expert Form Builder</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-xs">Studio / {editingId ? "Editando Modelo" : "Novo Modelo"}</p>
+          <div className="flex flex-col min-w-0">
+            <h2 className="text-slate-900 dark:text-white text-base md:text-lg font-bold leading-tight tracking-tight truncate">RT-Expert Form Builder</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-xs truncate">Studio / {editingId ? "Editando Modelo" : "Novo Modelo"}</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Button variant="outline" className="text-slate-700 dark:text-slate-300" onClick={() => setEditingMode(false)}>
+        <div className="flex items-center gap-2 md:gap-4 shrink-0">
+          <Button variant="outline" className="hidden md:inline-flex text-slate-700 dark:text-slate-300" onClick={handleExit}>
             Descartar / Sair
           </Button>
           <Button onClick={handleSave} disabled={loading} className="bg-primary hover:bg-primary/90 text-white shadow-sm">
-            <Save className="w-4 h-4 mr-2" />
-            {loading ? "Salvando..." : "Salvar e Publicar"}
+            <Save className="w-4 h-4 md:mr-2" />
+            <span className="hidden md:inline">{loading ? "Salvando..." : "Salvar e Publicar"}</span>
+            <span className="md:hidden ml-2">{loading ? "Salvando..." : "Salvar"}</span>
           </Button>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar: Components */}
-        <aside className="w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col p-6 overflow-y-auto">
+        {/* Left Sidebar: Components (tablet: estreita / desktop: completa) */}
+        <aside className="hidden md:flex md:w-56 lg:w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex-col p-4 lg:p-6 overflow-y-auto">
           <div className="mb-8">
             <h3 className="text-slate-900 dark:text-white text-sm font-bold uppercase tracking-wider mb-1">Componentes</h3>
             <p className="text-slate-500 dark:text-slate-400 text-xs">Clique para adicionar à seção ativa</p>
@@ -432,7 +580,16 @@ const ChecklistDesigner = () => {
                   {/* Section Delete Button */}
                   {activeSecaoId === secao.id && (
                     <div className="absolute -right-4 -top-4 flex gap-2">
-                      <button onClick={() => removeSecao(secao.id)} className="p-2 bg-red-500 text-white rounded-full shadow-md hover:bg-red-600 transition-colors">
+                      <button
+                        onClick={() => {
+                          if (secoes.length === 1) {
+                            toast.error("O modelo deve ter pelo menos uma seção.");
+                            return;
+                          }
+                          setDeleteSecaoId(secao.id);
+                        }}
+                        className="p-2 bg-red-500 text-white rounded-full shadow-md hover:bg-red-600 transition-colors"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -551,7 +708,7 @@ const ChecklistDesigner = () => {
         </main>
 
         {/* Right Sidebar: Properties */}
-        <aside className="w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto">
+        <aside className="hidden lg:flex w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex-col overflow-y-auto">
           <div className="p-6 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-slate-900 dark:text-white text-sm font-bold uppercase tracking-wider">Propriedades</h3>
@@ -601,94 +758,135 @@ const ChecklistDesigner = () => {
           </div>
 
           {activeField && (
-            <div className="p-6 space-y-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Título da Pergunta (Label)</label>
-                <textarea
-                  className="w-full rounded-lg border-slate-200 dark:border-slate-800 dark:bg-slate-800 text-sm focus:border-primary focus:ring-primary outline-none p-3"
-                  rows={3}
-                  value={activeField.label}
-                  onChange={(e) => updateCampo(activeField.id, { label: e.target.value })}
-                />
-              </div>
-
-              {(activeField.tipo === "texto" || activeField.tipo === "outros") && (
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Texto de Placeholder</label>
-                  <input
-                    className="w-full rounded-lg border-slate-200 dark:border-slate-800 dark:bg-slate-800 text-sm focus:border-primary focus:ring-primary outline-none"
-                    type="text"
-                    value={activeField.placeholder || ""}
-                    onChange={(e) => updateCampo(activeField.id, { placeholder: e.target.value })}
-                  />
-                </div>
-              )}
-
-              {activeField.tipo === "multipla_escolha" && (
-                <div className="space-y-3 pt-2">
-                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Opções de Resposta</label>
-                  {activeField.opcoes?.map((op, idx) => (
-                    <div key={idx} className="flex gap-2">
-                      <input
-                        className="flex-1 rounded-lg border-slate-200 dark:border-slate-800 text-sm p-2 outline-none"
-                        value={op}
-                        onChange={(e) => {
-                          const newOps = [...(activeField.opcoes || [])];
-                          newOps[idx] = e.target.value;
-                          updateCampo(activeField.id, { opcoes: newOps });
-                        }}
-                      />
-                      <button
-                        onClick={() => {
-                          const newOps = activeField.opcoes?.filter((_, i) => i !== idx);
-                          updateCampo(activeField.id, { opcoes: newOps });
-                        }}
-                        className="p-2 text-slate-400 hover:text-red-500"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => {
-                      const newOps = [...(activeField.opcoes || []), `Nova Opção ${(activeField.opcoes?.length || 0) + 1}`];
-                      updateCampo(activeField.id, { opcoes: newOps });
-                    }}
-                    className="text-xs font-bold text-primary flex items-center gap-1 mt-2"
-                  >
-                    <Plus className="w-3 h-3" /> Adicionar Opção
-                  </button>
-                </div>
-              )}
-
-              <div className="pt-4 space-y-4 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Resposta Obrigatória</label>
-                  <button
-                    onClick={() => updateCampo(activeField.id, { obrigatorio: !activeField.obrigatorio })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${activeField.obrigatorio ? "bg-primary" : "bg-slate-200 dark:bg-slate-700"}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${activeField.obrigatorio ? "translate-x-6" : "translate-x-1"}`}></span>
-                  </button>
-                </div>
-
-                {activeField.tipo === "multipla_escolha" && (
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Habilitar Observação</label>
-                    <button
-                      onClick={() => updateCampo(activeField.id, { tem_observacao: !activeField.tem_observacao })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${activeField.tem_observacao ? "bg-primary" : "bg-slate-200 dark:bg-slate-700"}`}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${activeField.tem_observacao ? "translate-x-6" : "translate-x-1"}`}></span>
-                    </button>
-                  </div>
-                )}
-              </div>
+            <div className="p-6">
+              {renderFieldProperties(activeField)}
             </div>
           )}
         </aside>
 
       </div>
+
+      {/* Mobile: bottom toolbar with components */}
+      <div className="md:hidden shrink-0 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-2 z-20">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {[
+            { tipo: "texto" as FieldType, icon: Type, label: "Texto" },
+            { tipo: "sim_nao_na" as FieldType, icon: ToggleLeft, label: "Sim/Não" },
+            { tipo: "multipla_escolha" as FieldType, icon: List, label: "Escolha" },
+            { tipo: "data" as FieldType, icon: CalendarDays, label: "Data" },
+            { tipo: "foto" as FieldType, icon: ImageIcon, label: "Foto" },
+            { tipo: "observacao" as FieldType, icon: Edit3, label: "Obs." },
+          ].map(({ tipo, icon: Icon, label }) => (
+            <button
+              key={tipo}
+              onClick={() => addCampo(tipo)}
+              className="flex flex-col items-center justify-center gap-1 min-w-[64px] px-2 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300"
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-[10px] font-medium whitespace-nowrap">{label}</span>
+            </button>
+          ))}
+          <button
+            onClick={addSecao}
+            className="flex flex-col items-center justify-center gap-1 min-w-[64px] px-2 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary"
+          >
+            <Plus className="w-5 h-5" />
+            <span className="text-[10px] font-bold whitespace-nowrap">Seção</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile/tablet: field properties sheet (celular: de baixo / tablet: lateral direita) */}
+      <Sheet open={isCompact && !!activeField} onOpenChange={(open) => { if (!open) setActiveCampoId(null); }}>
+        <SheetContent
+          side={isMobile ? "bottom" : "right"}
+          className={isMobile ? "max-h-[75vh] overflow-y-auto rounded-t-xl" : "w-[340px] sm:max-w-[340px] overflow-y-auto"}
+        >
+          <SheetHeader className="text-left">
+            <SheetTitle className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+              Propriedades do Campo
+            </SheetTitle>
+          </SheetHeader>
+          {activeField && (
+            <div className="pt-4 pb-2 space-y-6">
+              {renderFieldProperties(activeField)}
+
+              <div className="flex gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    const sId = getActiveFieldSecaoId();
+                    if (sId) moveCampo(sId, activeField.id, 'up');
+                  }}
+                >
+                  <ChevronUp className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    const sId = getActiveFieldSecaoId();
+                    if (sId) moveCampo(sId, activeField.id, 'down');
+                  }}
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    const sId = getActiveFieldSecaoId();
+                    if (sId) duplicarCampo(sId, activeField.id);
+                  }}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-red-500 hover:text-red-600"
+                  onClick={() => {
+                    const sId = getActiveFieldSecaoId();
+                    if (sId) removeCampo(sId, activeField.id);
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      <ConfirmDialog
+        open={exitConfirmOpen}
+        onOpenChange={setExitConfirmOpen}
+        title="Sair do editor?"
+        description="Alterações não salvas serão perdidas."
+        confirmLabel="Sair sem salvar"
+        destructive
+        onConfirm={() => {
+          setExitConfirmOpen(false);
+          setEditingMode(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!deleteSecaoId}
+        onOpenChange={(open) => { if (!open) setDeleteSecaoId(null); }}
+        title="Excluir seção?"
+        description="Todos os campos desta seção serão removidos junto com ela."
+        confirmLabel="Excluir seção"
+        destructive
+        onConfirm={() => {
+          if (deleteSecaoId) removeSecao(deleteSecaoId);
+          setDeleteSecaoId(null);
+        }}
+      />
     </div>
   );
 };

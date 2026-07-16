@@ -28,24 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-interface Agendamento {
-  id: string;
-  data_visita: string;
-  status: 'pendente' | 'concluido' | 'cancelado';
-  descricao: string;
-  cliente: {
-    id: string;
-    razao_social: string;
-    nome_fantasia: string | null;
-  };
-}
-
-interface Cliente {
-  id: string;
-  razao_social: string;
-  nome_fantasia: string | null;
-}
+import type { Agendamento, Cliente } from "@/types";
 
 const Visitas = () => {
   const navigate = useNavigate();

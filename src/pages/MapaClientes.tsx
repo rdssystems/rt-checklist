@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import L from "leaflet";
 
-// Fix for default marker icons in Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -16,18 +15,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-interface Cliente {
-  id: string;
-  nome_fantasia: string | null;
-  razao_social: string;
-  rua: string | null;
-  bairro: string | null;
-  cidade: string | null;
-  estado: string | null;
-  cep: string | null;
-  latitude: number | null;
-  longitude: number | null;
-}
+import type { Cliente } from "@/types";
 
 import { getPlanStatus, type PlanStatus } from "@/lib/plan-limits";
 import { Lock, Sparkles, ArrowRight, Loader2 } from "lucide-react";

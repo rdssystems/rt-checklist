@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, ClipboardList, FileCheck, TrendingUp, Filter, Plus, Map, CalendarDays, Clock, ArrowRight } from "lucide-react";
+import { Users, ClipboardList, FileCheck, Filter, Plus, Map, CalendarDays, Clock, ArrowRight } from "lucide-react";
 import { startOfMonth, endOfMonth, startOfDay, endOfDay, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Layout from "@/components/Layout";
@@ -93,50 +93,52 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-primary rounded-lg transition-colors group-hover:bg-primary group-hover:text-white">
+        {/* Stats Card (2x2) */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="grid grid-cols-2">
+            <div className="flex items-center gap-3 p-4 sm:p-6 border-b border-r border-slate-100 dark:border-slate-800 group">
+              <div className="p-2 shrink-0 bg-blue-50 dark:bg-blue-900/20 text-primary rounded-lg transition-colors group-hover:bg-primary group-hover:text-white">
                 <Users className="w-5 h-5" />
               </div>
+              <div className="min-w-0">
+                <p className="text-slate-500 dark:text-slate-400 text-[11px] sm:text-sm font-medium uppercase tracking-wider truncate">Total de Clientes</p>
+                <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{stats.clientes}</h3>
+                <p className="text-slate-400 text-xs hidden sm:block">Empresas cadastradas</p>
+              </div>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Total de Clientes</p>
-            <h3 className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{stats.clientes}</h3>
-            <p className="text-slate-400 text-xs mt-2">Empresas cadastradas</p>
-          </div>
 
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-lg transition-colors group-hover:bg-emerald-600 group-hover:text-white">
+            <div className="flex items-center gap-3 p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 group">
+              <div className="p-2 shrink-0 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 rounded-lg transition-colors group-hover:bg-emerald-600 group-hover:text-white">
                 <ClipboardList className="w-5 h-5" />
               </div>
+              <div className="min-w-0">
+                <p className="text-slate-500 dark:text-slate-400 text-[11px] sm:text-sm font-medium uppercase tracking-wider truncate">Modelos</p>
+                <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{stats.modelos}</h3>
+                <p className="text-slate-400 text-xs hidden sm:block">Templates disponíveis</p>
+              </div>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Modelos</p>
-            <h3 className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{stats.modelos}</h3>
-            <p className="text-slate-400 text-xs mt-2">Templates disponíveis</p>
-          </div>
 
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 rounded-lg transition-colors group-hover:bg-amber-600 group-hover:text-white">
+            <div className="flex items-center gap-3 p-4 sm:p-6 border-r border-slate-100 dark:border-slate-800 group">
+              <div className="p-2 shrink-0 bg-amber-50 dark:bg-amber-900/20 text-amber-600 rounded-lg transition-colors group-hover:bg-amber-600 group-hover:text-white">
                 <FileCheck className="w-5 h-5" />
               </div>
-            </div>
-            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Checklists</p>
-            <h3 className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{stats.aplicacoes}</h3>
-            <p className="text-slate-400 text-xs mt-2">Inspeções realizadas</p>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-lg transition-colors group-hover:bg-purple-600 group-hover:text-white">
-                <CalendarDays className="w-5 h-5" />
+              <div className="min-w-0">
+                <p className="text-slate-500 dark:text-slate-400 text-[11px] sm:text-sm font-medium uppercase tracking-wider truncate">Checklists</p>
+                <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{stats.aplicacoes}</h3>
+                <p className="text-slate-400 text-xs hidden sm:block">Inspeções realizadas</p>
               </div>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Visitas no Mês</p>
-            <h3 className="text-3xl font-bold text-slate-900 dark:text-white mt-1">{stats.agendamentosMes}</h3>
-            <p className="text-slate-400 text-xs mt-2">Agendamentos neste mês</p>
+
+            <div className="flex items-center gap-3 p-4 sm:p-6 group">
+              <div className="p-2 shrink-0 bg-purple-50 dark:bg-purple-900/20 text-purple-600 rounded-lg transition-colors group-hover:bg-purple-600 group-hover:text-white">
+                <CalendarDays className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-slate-500 dark:text-slate-400 text-[11px] sm:text-sm font-medium uppercase tracking-wider truncate">Visitas no Mês</p>
+                <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{stats.agendamentosMes}</h3>
+                <p className="text-slate-400 text-xs hidden sm:block">Agendamentos neste mês</p>
+              </div>
+            </div>
           </div>
         </div>
 

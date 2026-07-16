@@ -13,25 +13,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FileCheck, Building2, Save, FileDown, ArrowRight, ArrowLeft, Camera, X, Image as ImageIconLucide, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { compressImage } from "@/lib/image-utils";
+import { toTitleCase, toSentenceCase } from "@/lib/text-utils";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
-import jsPDF from "jspdf";
+import { gerarPDFInspecao } from "@/lib/pdf-generator";
+import customSelectStyles from "@/components/select-styles";
 import Select from "react-select";
-
-interface Cliente {
-  id: string;
-  razao_social: string;
-  nome_fantasia: string | null;
-  cnpj: string;
-  rua: string | null;
-  bairro: string | null;
-  cidade: string | null;
-  estado: string | null;
-  responsavel_legal: string | null;
-}
+import type { Cliente } from "@/types";
 
 interface CampoChecklist {
   id: string;
-  tipo: "titulo" | "descricao" | "sim_nao_na" | "observacao" | "foto" | "multipla_escolha" | "data" | "outros";
+  tipo: "titulo" | "descricao" | "sim_nao_na" | "observacao" | "foto" | "multipla_escolha" | "data" | "texto" | "outros";
   label: string;
   opcoes?: string[];
   obrigatorio?: boolean;
@@ -43,7 +34,7 @@ interface Modelo {
   nome_modelo: string;
   estrutura_json: {
     campos?: CampoChecklist[];
-    secoes?: any[];
+    secoes?: { id: string; titulo?: string; descricao?: string; campos: CampoChecklist[] }[];
   };
 }
 
@@ -243,401 +234,24 @@ const AplicarChecklist = () => {
   const gerarPDF = async () => {
     if (!clienteAtual || !modeloAtual) return;
 
-    const pdf = new jsPDF();
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 15;
-    const contentWidth = pageWidth - 2 * margin;
-    let yPos = margin;
-
-    let logoWidth = 30;
-    let logoHeight = 15;
-    if (logoUrl) {
-      try {
-        const img = new window.Image();
-        img.crossOrigin = "Anonymous";
-        img.src = logoUrl;
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-        });
-        const ratio = img.width / img.height;
-        logoHeight = 15;
-        logoWidth = 15 * ratio;
-        if (logoWidth > 40) {
-          logoWidth = 40;
-          logoHeight = 40 / ratio;
-        }
-      } catch (e) {
-        console.error("Error loading logo dimensions:", e);
-      }
-    }
-
-    if (logoUrl) {
-      try {
-        pdf.addImage(logoUrl, "PNG", margin, yPos, logoWidth, logoHeight);
-      } catch (e) {
-        console.error("Error adding logo:", e);
-      }
-    }
-
-    pdf.setFontSize(9);
-    pdf.setFont("helvetica", "normal");
-    if (companyName) {
-      pdf.text(companyName, pageWidth - margin, yPos, { align: "right" });
-    }
-    pdf.text(new Date().toLocaleDateString("pt-BR"), pageWidth - margin, yPos + 5, { align: "right" });
-
-    yPos += 12;
-
-    pdf.setFontSize(20);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Relatório de Inspeção", pageWidth / 2, yPos, { align: "center" });
-    yPos += 8;
-
-    pdf.setFontSize(12);
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(100, 100, 100);
-    pdf.text(modeloAtual.nome_modelo, pageWidth / 2, yPos, { align: "center" });
-    pdf.setTextColor(0, 0, 0);
-    yPos += 8;
-
-    pdf.setDrawColor(200, 200, 200);
-    pdf.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 6;
-
-    pdf.setFillColor(245, 245, 245);
-    const boxHeight = clienteAtual.responsavel_legal ? 24 : 18;
-    pdf.rect(margin, yPos, contentWidth, boxHeight, "F");
-
-    yPos += 5;
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Razão Social:", margin + 3, yPos);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(clienteAtual.razao_social, margin + 35, yPos);
-    yPos += 5;
-
-    pdf.setFont("helvetica", "bold");
-    pdf.text("CNPJ:", margin + 3, yPos);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(clienteAtual.cnpj, margin + 35, yPos);
-    yPos += 5;
-
-    const endereco = [clienteAtual.rua, clienteAtual.bairro, clienteAtual.cidade, clienteAtual.estado].filter(Boolean).join(", ");
-    if (endereco) {
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Endereço:", margin + 3, yPos);
-      pdf.setFont("helvetica", "normal");
-      const enderecoLines = pdf.splitTextToSize(endereco, contentWidth - 38);
-      pdf.text(enderecoLines, margin + 35, yPos);
-      yPos += 5 * enderecoLines.length;
-    }
-
-    if (clienteAtual.responsavel_legal) {
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Responsável Legal:", margin + 3, yPos);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(clienteAtual.responsavel_legal, margin + 48, yPos);
-      yPos += 4;
-    }
-
-    yPos += 6;
-
-    const secoes = modeloAtual.estrutura_json?.secoes ||
-      (modeloAtual.estrutura_json?.campos ? [{ id: 'default', titulo: '', campos: modeloAtual.estrutura_json.campos }] : []);
-
-    const campos = secoes.flatMap((secao: any) => {
-      const result = [];
-      if (secao.titulo) {
-        result.push({ tipo: "titulo", label: secao.titulo, id: `sec-${secao.id}` });
-      }
-      return result.concat(secao.campos || []);
+    await gerarPDFInspecao({
+      logoUrl,
+      companyName,
+      nomeRT,
+      modeloNome: modeloAtual.nome_modelo,
+      secoes: modeloAtual.estrutura_json?.secoes || (modeloAtual.estrutura_json?.campos ? [{ id: 'default', titulo: '', campos: modeloAtual.estrutura_json.campos }] : []),
+      respostas,
+      parecerConclusivo,
+      dataProximaInspecao,
+      responsavelInspecao: nomeRT,
+      assinaturaRT,
+      assinaturaCliente,
+      assinaturaTestemunha,
+      nomeClienteAssinatura,
+      nomeTestemunhaAssinatura,
+      cliente: clienteAtual,
     });
 
-    let itemNumber = 1;
-    let headerDrawnForSection = false;
-
-    campos.forEach((campo: any) => {
-      if (yPos > pageHeight - 50) {
-        pdf.addPage();
-        yPos = margin;
-        headerDrawnForSection = false;
-      }
-
-      if (campo.tipo === "titulo") {
-        pdf.setFillColor(245, 245, 255);
-        pdf.setDrawColor(200, 200, 200);
-        pdf.setLineWidth(0.1);
-        const titleHeight = 8;
-        pdf.rect(margin, yPos, contentWidth, titleHeight, "FD");
-        pdf.setFontSize(10);
-        pdf.setFont("helvetica", "bold");
-        pdf.setTextColor(40, 40, 180);
-        pdf.text(campo.label, margin + 2, yPos + 5);
-        pdf.setTextColor(0, 0, 0);
-        yPos += titleHeight;
-
-        pdf.setFontSize(10);
-        pdf.setFont("helvetica", "bold");
-        pdf.setFillColor(230, 230, 230);
-        pdf.rect(margin, yPos, contentWidth, 8, "FD");
-        pdf.text("ITEM", margin + 2, yPos + 5);
-        pdf.text("PERGUNTA", margin + 14, yPos + 5);
-        pdf.text("RESPOSTA", margin + 114, yPos + 5);
-        yPos += 8;
-        headerDrawnForSection = true;
-      } else if (campo.tipo === "descricao") {
-        pdf.setFillColor(250, 250, 250);
-        pdf.setDrawColor(200, 200, 200);
-        pdf.setLineWidth(0.1);
-        pdf.setFontSize(8);
-        pdf.setFont("helvetica", "italic");
-        pdf.setTextColor(100, 100, 100);
-        const descLines = pdf.splitTextToSize(campo.label, contentWidth - 4);
-        const descHeight = descLines.length * 4 + 2;
-        pdf.rect(margin, yPos, contentWidth, descHeight, "FD");
-        pdf.text(descLines, margin + 2, yPos + 3);
-        pdf.setTextColor(0, 0, 0);
-        yPos += descHeight;
-      } else {
-        if (!headerDrawnForSection) {
-          pdf.setFontSize(10);
-          pdf.setFont("helvetica", "bold");
-          pdf.setFillColor(230, 230, 230);
-          pdf.setDrawColor(200, 200, 200);
-          pdf.setLineWidth(0.1);
-          pdf.rect(margin, yPos, contentWidth, 8, "FD");
-          pdf.text("ITEM", margin + 2, yPos + 5);
-          pdf.text("PERGUNTA", margin + 14, yPos + 5);
-          pdf.text("RESPOSTA", margin + 114, yPos + 5);
-          yPos += 8;
-          headerDrawnForSection = true;
-        }
-
-        const resposta = respostas[campo.id];
-        const outrosText = respostas[`${campo.id}_outros_text`];
-        let respostaText = "---";
-
-        if (campo.tipo === "foto" && Array.isArray(resposta) && resposta.length > 0) {
-          respostaText = `${resposta.length} foto(s) anexada(s)`;
-        } else if (Array.isArray(resposta)) {
-          respostaText = resposta.join(", ");
-          if (outrosText) {
-            respostaText += ` (${outrosText})`;
-          }
-        } else if (resposta !== undefined && resposta !== null && resposta !== "") {
-          respostaText = String(resposta);
-        }
-
-        const observacao = respostas[`${campo.id}_observacao`];
-        if (observacao) {
-          respostaText += `\nObs: ${observacao}`;
-        }
-
-        pdf.setDrawColor(200, 200, 200);
-        pdf.setLineWidth(0.1);
-
-        pdf.setFontSize(8);
-        pdf.setFont("helvetica", "normal");
-        const perguntaLines = pdf.splitTextToSize(campo.label, 96);
-        const respostaLines = pdf.splitTextToSize(respostaText, contentWidth - 116);
-        const rowHeight = Math.max(perguntaLines.length, respostaLines.length) * 4 + 3;
-
-        const col1W = 12;
-        const col2W = 100;
-        const col3W = contentWidth - 112;
-
-        pdf.rect(margin, yPos, col1W, rowHeight);
-        pdf.rect(margin + col1W, yPos, col2W, rowHeight);
-        pdf.rect(margin + col1W + col2W, yPos, col3W, rowHeight);
-
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(8);
-        pdf.text(String(itemNumber), margin + 6, yPos + 4, { align: "center" });
-
-        pdf.setFont("helvetica", "normal");
-        pdf.text(perguntaLines, margin + 14, yPos + 3);
-
-        if (campo.tipo === "foto" && Array.isArray(resposta) && resposta.length > 0) {
-          pdf.setTextColor(0, 100, 0);
-          pdf.setFont("helvetica", "bold");
-          pdf.text(respostaText, margin + 114, yPos + 3);
-          pdf.setTextColor(0, 0, 0);
-          pdf.setFont("helvetica", "normal");
-        } else {
-          pdf.text(respostaLines, margin + 114, yPos + 3);
-        }
-
-        yPos += rowHeight;
-        itemNumber++;
-      }
-    });
-
-    const allPhotos: { url: string, label: string }[] = [];
-    campos.forEach((campo: any) => {
-      if (campo.tipo === "foto" && Array.isArray(respostas[campo.id])) {
-        respostas[campo.id].forEach((url: string) => {
-          allPhotos.push({ url, label: campo.label });
-        });
-      }
-    });
-
-    if (allPhotos.length > 0) {
-      pdf.addPage();
-      yPos = margin;
-      pdf.setFontSize(16);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Arquivo Fotográfico", pageWidth / 2, yPos, { align: "center" });
-      yPos += 10;
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, yPos, pageWidth - margin, yPos);
-      yPos += 10;
-
-      const cols = 4;
-      const spacing = 4;
-      const imgWidth = (contentWidth - (spacing * (cols - 1))) / cols;
-      const imgHeight = imgWidth * 0.75;
-
-      for (let i = 0; i < allPhotos.length; i += cols) {
-        if (yPos + imgHeight + 15 > pageHeight - 30) {
-          pdf.addPage();
-          yPos = margin;
-        }
-
-        for (let j = 0; j < cols && (i + j) < allPhotos.length; j++) {
-          const photo = allPhotos[i + j];
-          const xPos = margin + (j * (imgWidth + spacing));
-
-          try {
-            pdf.addImage(photo.url, "JPEG", xPos, yPos, imgWidth, imgHeight);
-            pdf.setFontSize(6);
-            pdf.setFont("helvetica", "italic");
-            pdf.text(`${i + j + 1}`, xPos + (imgWidth / 2), yPos + imgHeight + 3, { align: "center" });
-          } catch (e) {
-            console.error("Error adding photo to PDF:", e);
-          }
-        }
-        yPos += imgHeight + 8;
-      }
-      yPos += 5;
-    }
-
-    if (parecerConclusivo) {
-      if (yPos > pageHeight - 30) {
-        pdf.addPage();
-        yPos = margin;
-      }
-      yPos += 5;
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Parecer Conclusivo:", margin, yPos);
-      yPos += 6;
-      pdf.setFont("helvetica", "normal");
-      const parecerLines = pdf.splitTextToSize(parecerConclusivo, contentWidth);
-      pdf.text(parecerLines, margin, yPos);
-      yPos += (4 * parecerLines.length) + 8;
-    }
-
-    if (dataProximaInspecao) {
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Próxima Inspeção:", margin, yPos);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(new Date(dataProximaInspecao).toLocaleDateString("pt-BR"), margin + 40, yPos);
-      yPos += 8;
-    }
-
-    if (nomeRT) {
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Responsável pela Inspeção:", margin, yPos);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(nomeRT, margin + 48, yPos);
-      yPos += 12;
-    }
-
-    if (assinaturaRT || assinaturaCliente || assinaturaTestemunha) {
-      if (yPos > pageHeight - 65) {
-        pdf.addPage();
-        yPos = margin + 10;
-      } else {
-        yPos += 12;
-      }
-
-      const signatureWidth = 50;
-      const signatureHeight = 18;
-      const spacing = (contentWidth - (signatureWidth * 3)) / 2;
-
-      let xPos = margin;
-
-      if (assinaturaRT) {
-        pdf.addImage(assinaturaRT, "PNG", xPos, yPos, signatureWidth, signatureHeight);
-      }
-      pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
-      pdf.setFontSize(8);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(nomeRT, xPos + signatureWidth / 2, yPos + signatureHeight + 6, { align: "center" });
-      pdf.setFont("helvetica", "normal");
-      pdf.text("Responsável Técnico", xPos + signatureWidth / 2, yPos + signatureHeight + 10, { align: "center" });
-      
-      xPos += signatureWidth + spacing;
-
-      if (assinaturaCliente) {
-        pdf.addImage(assinaturaCliente, "PNG", xPos, yPos, signatureWidth, signatureHeight);
-      }
-      pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(nomeClienteAssinatura || "Dono/Gerente", xPos + signatureWidth / 2, yPos + signatureHeight + 6, { align: "center" });
-      pdf.setFont("helvetica", "normal");
-      pdf.text("Dono do Estabelecimento", xPos + signatureWidth / 2, yPos + signatureHeight + 10, { align: "center" });
-      
-      xPos += signatureWidth + spacing;
-
-      if (assinaturaTestemunha || nomeTestemunhaAssinatura) {
-        if (assinaturaTestemunha) {
-          pdf.addImage(assinaturaTestemunha, "PNG", xPos, yPos, signatureWidth, signatureHeight);
-        }
-        pdf.line(xPos, yPos + signatureHeight + 2, xPos + signatureWidth, yPos + signatureHeight + 2);
-        pdf.setFont("helvetica", "bold");
-        pdf.text(nomeTestemunhaAssinatura || "", xPos + signatureWidth / 2, yPos + signatureHeight + 6, { align: "center" });
-        pdf.setFont("helvetica", "normal");
-        pdf.text("Testemunha", xPos + signatureWidth / 2, yPos + signatureHeight + 10, { align: "center" });
-      }
-      
-      yPos += signatureHeight + 15;
-    }
-
-    const pageCount = (pdf as any).internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      pdf.setPage(i);
-      const footerY = pageHeight - 12;
-      pdf.setDrawColor(220, 220, 220);
-      pdf.setLineWidth(0.1);
-      pdf.line(margin, footerY - 8, pageWidth - margin, footerY - 8);
-      pdf.setFontSize(6);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(150, 150, 150);
-      pdf.text("Gerado automaticamente por", pageWidth / 2, footerY - 4, { align: "center" });
-      pdf.setFontSize(10);
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFont("helvetica", "bold");
-      const rtWidth = pdf.getTextWidth("RT ");
-      const expertWidth = pdf.getTextWidth("Expert");
-      const totalWidth = rtWidth + expertWidth;
-      const startX = (pageWidth - totalWidth) / 2;
-      pdf.text("RT ", startX, footerY);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(59, 130, 246);
-      pdf.text("Expert", startX + rtWidth, footerY);
-      pdf.setFontSize(5);
-      pdf.setTextColor(160, 160, 160);
-      pdf.setFont("helvetica", "normal");
-      pdf.text("GESTÃO INTELIGENTE", pageWidth / 2, footerY + 3.5, { align: "center" });
-      pdf.setFontSize(6);
-      pdf.setTextColor(180, 180, 180);
-      pdf.text(`Página ${i} de ${pageCount}`, pageWidth - margin, footerY + 3.5, { align: "right" });
-    }
-
-    pdf.save(`relatorio_${clienteAtual.razao_social}_${new Date().toISOString().split("T")[0]}.pdf`);
     toast.success("PDF gerado com sucesso!");
   };
 
@@ -679,11 +293,11 @@ const AplicarChecklist = () => {
       assinatura_rt: assinaturaRT,
       assinatura_cliente: assinaturaCliente,
       assinatura_testemunha: assinaturaTestemunha,
-      parecer_conclusivo: parecerConclusivo,
+      parecer_conclusivo: toSentenceCase(parecerConclusivo),
       data_proxima_inspecao: dataProximaInspecao || null,
-      responsavel_inspecao: nomeRT,
-      nome_cliente_assinatura: nomeClienteAssinatura,
-      nome_testemunha_assinatura: nomeTestemunhaAssinatura
+      responsavel_inspecao: toTitleCase(nomeRT),
+      nome_cliente_assinatura: toTitleCase(nomeClienteAssinatura),
+      nome_testemunha_assinatura: toTitleCase(nomeTestemunhaAssinatura)
     };
     const { error } = await supabase.from("aplicacoes_checklist").insert([dataToSave]);
     setLoading(false);
@@ -736,41 +350,6 @@ const AplicarChecklist = () => {
       setDataProximaInspecao("");
       setIsReviewMode(false);
     }
-  };
-
-  const customSelectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      borderRadius: '0.75rem',
-      borderColor: state.isFocused ? 'hsl(var(--primary))' : 'hsl(var(--border))',
-      boxShadow: state.isFocused ? '0 0 0 1px hsl(var(--primary))' : 'none',
-      padding: '0.15rem',
-      backgroundColor: 'hsl(var(--background))',
-      '&:hover': {
-        borderColor: 'hsl(var(--primary))'
-      }
-    }),
-    option: (provided: any, state: any) => ({
-      ...provided,
-      backgroundColor: state.isSelected ? 'hsl(var(--primary))' : state.isFocused ? 'hsl(var(--muted))' : 'transparent',
-      color: state.isSelected ? 'white' : 'inherit',
-      cursor: 'pointer',
-      '&:active': {
-        backgroundColor: 'hsl(var(--primary))',
-      }
-    }),
-    menu: (provided: any) => ({
-      ...provided,
-      borderRadius: '0.75rem',
-      overflow: 'hidden',
-      zIndex: 50,
-      backgroundColor: 'hsl(var(--background))',
-      border: '1px solid hsl(var(--border))',
-    }),
-    singleValue: (provided: any) => ({
-      ...provided,
-      color: 'hsl(var(--foreground))',
-    }),
   };
 
   return (

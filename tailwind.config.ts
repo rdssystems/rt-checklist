@@ -13,6 +13,11 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ['"Big Shoulders Display"', "sans-serif"],
+        plex: ['"IBM Plex Sans"', "sans-serif"],
+        "plex-mono": ['"IBM Plex Mono"', "monospace"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

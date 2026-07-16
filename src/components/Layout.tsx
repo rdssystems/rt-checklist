@@ -95,7 +95,7 @@ const Layout = ({ children }: LayoutProps) => {
       const daysLeft = trialEnds ? Math.max(0, Math.ceil((trialEnds.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : 0;
       
       setPlanStatus({
-        isPremium: profileData.plan_type === 'premium' || trialActive,
+        isPremium: profileData.plan_type === 'premium' || profileData.plan_type === 'expert' || trialActive,
         planType: profileData.plan_type || 'free',
         daysLeft
       });

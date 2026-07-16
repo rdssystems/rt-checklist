@@ -1,9 +1,9 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { AuthProvider } from "@/hooks/useAuth";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import Clientes from "./pages/Clientes";
@@ -23,22 +23,22 @@ const App = () => (
     <TooltipProvider>
       <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
         <Toaster />
-        <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/clientes" element={<Clientes />} />
-            <Route path="/mapa-clientes" element={<MapaClientes />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/checklist-designer" element={<ChecklistDesigner />} />
-            <Route path="/aplicar-checklist" element={<AplicarChecklist />} />
-            <Route path="/checklists-prontos" element={<ChecklistsProntos />} />
-            <Route path="/visitas" element={<Visitas />} />
-            <Route path="/upgrade" element={<Upgrade />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/clientes" element={<Clientes />} />
+              <Route path="/mapa-clientes" element={<MapaClientes />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/checklist-designer" element={<ChecklistDesigner />} />
+              <Route path="/aplicar-checklist" element={<AplicarChecklist />} />
+              <Route path="/checklists-prontos" element={<ChecklistsProntos />} />
+              <Route path="/visitas" element={<Visitas />} />
+              <Route path="/upgrade" element={<Upgrade />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
         </BrowserRouter>
       </GoogleOAuthProvider>
     </TooltipProvider>

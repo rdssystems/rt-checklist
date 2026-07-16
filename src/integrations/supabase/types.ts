@@ -25,6 +25,8 @@ export type Database = {
           data_proxima_inspecao: string | null
           id: string
           modelo_id: string
+          nome_cliente_assinatura: string | null
+          nome_testemunha_assinatura: string | null
           parecer_conclusivo: string | null
           responsavel_inspecao: string | null
           respostas_json: Json
@@ -40,6 +42,8 @@ export type Database = {
           data_proxima_inspecao?: string | null
           id?: string
           modelo_id: string
+          nome_cliente_assinatura?: string | null
+          nome_testemunha_assinatura?: string | null
           parecer_conclusivo?: string | null
           responsavel_inspecao?: string | null
           respostas_json?: Json
@@ -55,6 +59,8 @@ export type Database = {
           data_proxima_inspecao?: string | null
           id?: string
           modelo_id?: string
+          nome_cliente_assinatura?: string | null
+          nome_testemunha_assinatura?: string | null
           parecer_conclusivo?: string | null
           responsavel_inspecao?: string | null
           respostas_json?: Json
@@ -98,6 +104,7 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           nome_fantasia: string | null
+          numero: string | null
           razao_social: string
           responsavel_legal: string | null
           rua: string | null
@@ -117,6 +124,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           nome_fantasia?: string | null
+          numero?: string | null
           razao_social: string
           responsavel_legal?: string | null
           rua?: string | null
@@ -136,6 +144,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           nome_fantasia?: string | null
+          numero?: string | null
           razao_social?: string
           responsavel_legal?: string | null
           rua?: string | null
@@ -187,30 +196,102 @@ export type Database = {
           },
         ]
       }
+      agendamentos: {
+        Row: {
+          id: string
+          tenant_id: string
+          cliente_id: string
+          data_visita: string
+          status: string
+          descricao: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          cliente_id: string
+          data_visita: string
+          status?: string
+          descricao?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          cliente_id?: string
+          data_visita?: string
+          status?: string
+          descricao?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          avatar_url: string | null
           company_name: string | null
+          cpf_cnpj: string | null
           created_at: string | null
           email: string
+          google_access_token: string | null
+          google_refresh_token: string | null
+          google_token_expiry: string | null
           id: string
           logo_url: string | null
           nome_rt: string
+          nomination_limit: number | null
+          plan_type: string | null
+          subscription_id: string | null
+          trial_ends_at: string | null
         }
         Insert: {
+          avatar_url?: string | null
           company_name?: string | null
+          cpf_cnpj?: string | null
           created_at?: string | null
           email: string
+          google_access_token?: string | null
+          google_refresh_token?: string | null
+          google_token_expiry?: string | null
           id: string
           logo_url?: string | null
           nome_rt: string
+          nomination_limit?: number | null
+          plan_type?: string | null
+          subscription_id?: string | null
+          trial_ends_at?: string | null
         }
         Update: {
+          avatar_url?: string | null
           company_name?: string | null
+          cpf_cnpj?: string | null
           created_at?: string | null
           email?: string
+          google_access_token?: string | null
+          google_refresh_token?: string | null
+          google_token_expiry?: string | null
           id?: string
           logo_url?: string | null
           nome_rt?: string
+          nomination_limit?: number | null
+          plan_type?: string | null
+          subscription_id?: string | null
+          trial_ends_at?: string | null
         }
         Relationships: []
       }

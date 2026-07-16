@@ -9,41 +9,13 @@ import { FileCheck, Download, Calendar, User, Building2, Trash2, Search, Eye } f
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import jsPDF from "jspdf";
+import { gerarPDFInspecao } from "@/lib/pdf-generator";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-
-interface ChecklistPronto {
-  id: string;
-  data_aplicacao: string;
-  modelo_id: string;
-  cliente_id: string;
-  respostas_json: any;
-  parecer_conclusivo: string | null;
-  data_proxima_inspecao: string | null;
-  responsavel_inspecao: string | null;
-  assinatura_rt: string | null;
-  assinatura_cliente: string | null;
-  assinatura_testemunha?: string | null;
-  nome_cliente_assinatura: string | null;
-  nome_testemunha_assinatura: string | null;
-  modelos_checklist: {
-    nome_modelo: string;
-    estrutura_json: any;
-  };
-  clientes: {
-    razao_social: string;
-    cnpj: string;
-    rua: string;
-    bairro: string;
-    cidade: string;
-    estado: string;
-    cep: string;
-    responsavel_legal: string;
-  };
-}
+import ConfirmDialog from "@/components/ConfirmDialog";
+import type { ChecklistPronto } from "@/types";
 
 const ChecklistsProntos = () => {
   const [checklists, setChecklists] = useState<ChecklistPronto[]>([]);
@@ -56,6 +28,7 @@ const ChecklistsProntos = () => {
   const [empresas, setEmpresas] = useState<{ id: string, razao_social: string }[]>([]);
   const [selectedFilterId, setSelectedFilterId] = useState<string | null>(null);
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadChecklists();
@@ -104,8 +77,22 @@ const ChecklistsProntos = () => {
     setEmpresas(companiesData || []);
   };
 
+  // Percorre as respostas e coleta os caminhos (dentro do bucket) de todas as fotos referenciadas
+  const extractPhotoPaths = (value: unknown, paths: string[] = []): string[] => {
+    const marker = "/checklist_fotos/";
+    if (typeof value === "string") {
+      const idx = value.indexOf(marker);
+      if (idx !== -1) paths.push(decodeURIComponent(value.slice(idx + marker.length)));
+    } else if (Array.isArray(value)) {
+      value.forEach((v) => extractPhotoPaths(v, paths));
+    } else if (value && typeof value === "object") {
+      Object.values(value).forEach((v) => extractPhotoPaths(v, paths));
+    }
+    return paths;
+  };
+
   const handleDelete = async (id: string) => {
-    if (!confirm("Deseja realmente excluir este checklist?")) return;
+    const checklist = checklists.find((c) => c.id === id);
 
     const { error } = await supabase
       .from("aplicacoes_checklist")
@@ -114,10 +101,22 @@ const ChecklistsProntos = () => {
 
     if (error) {
       toast.error("Erro ao excluir checklist");
-    } else {
-      toast.success("Checklist excluído com sucesso!");
-      loadChecklists();
+      return;
     }
+
+    // Remove as fotos do storage somente após o registro ser excluído com sucesso
+    const photoPaths = extractPhotoPaths(checklist?.respostas_json);
+    if (photoPaths.length > 0) {
+      const { error: storageError } = await supabase.storage
+        .from("checklist_fotos")
+        .remove(photoPaths);
+      if (storageError) {
+        console.error("Erro ao apagar fotos do storage:", storageError);
+      }
+    }
+
+    toast.success("Checklist excluído com sucesso!");
+    loadChecklists();
   };
 
   const filteredChecklists = checklists.filter((checklist) => {
@@ -134,7 +133,6 @@ const ChecklistsProntos = () => {
 
   const generatePDF = async (checklist: ChecklistPronto) => {
     try {
-      // Fetch logo and company name from profile
       const { data: { user } } = await supabase.auth.getUser();
       let logoUrl = "";
       let companyName = "";
@@ -148,448 +146,40 @@ const ChecklistsProntos = () => {
           .single();
 
         if (profile) {
-          logoUrl = profile.logo_url || "";
-          companyName = profile.company_name || "";
-          rtCpfCnpj = profile.cpf_cnpj || "";
+          logoUrl = (profile as Record<string, string>).logo_url || "";
+          companyName = (profile as Record<string, string>).company_name || "";
+          rtCpfCnpj = (profile as Record<string, string>).cpf_cnpj || "";
         }
       }
 
-      const pdf = new jsPDF();
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15; // Reduced margin from 20 to 15 for better space usage
-      const contentWidth = pageWidth - 2 * margin;
-      let yPos = margin;
-
-      let logoWidth = 30;
-      let logoHeight = 15;
-      if (logoUrl) {
-        try {
-          const img = new window.Image();
-          img.crossOrigin = "Anonymous";
-          img.src = logoUrl;
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-          });
-          const ratio = img.width / img.height;
-          logoHeight = 15;
-          logoWidth = 15 * ratio;
-          if (logoWidth > 40) {
-            logoWidth = 40;
-            logoHeight = 40 / ratio;
-          }
-        } catch (e) {
-          console.error("Error loading logo dimensions:", e);
-        }
-      }
-
-      // HEADER
-      // Add logo if available
-      if (logoUrl) {
-        try {
-          pdf.addImage(logoUrl, "PNG", margin, yPos, logoWidth, logoHeight);
-        } catch (e) {
-          console.error("Error adding logo:", e);
-        }
-      }
-
-      // Company name and date on the right
-      pdf.setFontSize(9);
-      pdf.setFont("helvetica", "normal");
-      if (companyName) {
-        pdf.text(companyName, pageWidth - margin, yPos, { align: "right" });
-      }
-      
-      if (rtCpfCnpj) {
-        const formatted = rtCpfCnpj.replace(/\D/g, "").length > 11 
-          ? rtCpfCnpj.replace(/\D/g, "").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
-          : rtCpfCnpj.replace(/\D/g, "").replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
-        pdf.setFontSize(8);
-        pdf.text(formatted.trim(), pageWidth - margin, yPos + 4, { align: "right" });
-        pdf.setFontSize(9);
-      }
-
-      pdf.text(format(new Date(checklist.data_aplicacao), "dd/MM/yyyy"), pageWidth - margin, yPos + (rtCpfCnpj ? 8 : 5), { align: "right" });
-
-      yPos += 12; // Reduced gap from 20 to 12
-
-      // Title - centered and bold
-      pdf.setFontSize(20);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Relatório de Inspeção", pageWidth / 2, yPos, { align: "center" });
-      yPos += 8;
-
-      // Subtitle - category/checklist name
-      pdf.setFontSize(12);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(checklist.modelos_checklist.nome_modelo, pageWidth / 2, yPos, { align: "center" });
-      pdf.setTextColor(0, 0, 0);
-      yPos += 10;
-
-      // Separator line
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, yPos, pageWidth - margin, yPos);
-      yPos += 10;
-
-      // CLIENT INFO BOX
-      pdf.setFillColor(245, 245, 245);
-      const boxHeight = checklist.clientes.responsavel_legal ? 28 : 22;
-      pdf.rect(margin, yPos, contentWidth, boxHeight, "F");
-
-      yPos += 6;
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Razão Social:", margin + 3, yPos);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(checklist.clientes.razao_social, margin + 35, yPos);
-      yPos += 5;
-
-      pdf.setFont("helvetica", "bold");
-      pdf.text("CNPJ:", margin + 3, yPos);
-      pdf.setFont("helvetica", "normal");
-      const formattedCNPJ = (checklist.clientes.cnpj || "").replace(/\D/g, "").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
-      pdf.text(formattedCNPJ, margin + 35, yPos);
-      yPos += 5;
-
-      const endereco = `${checklist.clientes.rua}, ${checklist.clientes.bairro}, ${checklist.clientes.cidade}, ${checklist.clientes.estado}`;
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Endereço:", margin + 3, yPos);
-      pdf.setFont("helvetica", "normal");
-      const enderecoLines = pdf.splitTextToSize(endereco, contentWidth - 38);
-      pdf.text(enderecoLines, margin + 35, yPos);
-      yPos += 5 * enderecoLines.length;
-
-      if (checklist.clientes.responsavel_legal) {
-        pdf.setFont("helvetica", "bold");
-        pdf.text("Responsável Legal:", margin + 3, yPos);
-        pdf.setFont("helvetica", "normal");
-        pdf.text(checklist.clientes.responsavel_legal, margin + 48, yPos);
-        yPos += 5;
-      }
-
-      yPos += 8;
-
-      // RESPONSES SECTION - TABLE FORMAT
-      const secoes = checklist.modelos_checklist.estrutura_json?.secoes ||
-        (checklist.modelos_checklist.estrutura_json?.campos ? [{ id: 'default', titulo: '', campos: checklist.modelos_checklist.estrutura_json.campos }] : []);
-
-      const campos = secoes.flatMap((secao: any) => {
-        const result = [];
-        if (secao.titulo) {
-          result.push({ tipo: "titulo", label: secao.titulo, id: `sec-${secao.id}` });
-        }
-        return result.concat(secao.campos || []);
-      });
-      const respostas = checklist.respostas_json || {};
-
-      let itemNumber = 1;
-      let headerDrawnForSection = false;
-
-      campos.forEach((campo: any) => {
-        if (yPos > pageHeight - 50) {
-          pdf.addPage();
-          yPos = margin;
-          headerDrawnForSection = false;
-        }
-
-        if (campo.tipo === "titulo") {
-          // Draw Section Title first
-          pdf.setFillColor(245, 245, 255);
-          pdf.setDrawColor(200, 200, 200);
-          pdf.setLineWidth(0.1);
-          const titleHeight = 8;
-          pdf.rect(margin, yPos, contentWidth, titleHeight, "FD");
-          pdf.setFontSize(10);
-          pdf.setFont("helvetica", "bold");
-          pdf.setTextColor(40, 40, 180);
-          pdf.text(campo.label, margin + 2, yPos + 5);
-          pdf.setTextColor(0, 0, 0);
-          yPos += titleHeight;
-
-          // Immediately draw table header for this section
-          pdf.setFontSize(10);
-          pdf.setFont("helvetica", "bold");
-          pdf.setFillColor(230, 230, 230);
-          pdf.rect(margin, yPos, contentWidth, 8, "FD");
-          pdf.text("ITEM", margin + 2, yPos + 5);
-          pdf.text("PERGUNTA", margin + 14, yPos + 5);
-          pdf.text("RESPOSTA", margin + 114, yPos + 5);
-          yPos += 8;
-          headerDrawnForSection = true;
-        } else if (campo.tipo === "descricao") {
-          // Description in table
-          pdf.setFillColor(250, 250, 250);
-          pdf.setDrawColor(200, 200, 200);
-          pdf.setLineWidth(0.1);
-          pdf.setFontSize(8);
-          pdf.setFont("helvetica", "italic");
-          pdf.setTextColor(100, 100, 100);
-          const descLines = pdf.splitTextToSize(campo.label, contentWidth - 4);
-          const descHeight = descLines.length * 4 + 2;
-          pdf.rect(margin, yPos, contentWidth, descHeight, "FD");
-          pdf.text(descLines, margin + 2, yPos + 3);
-          pdf.setTextColor(0, 0, 0);
-          yPos += descHeight;
-        } else {
-          // If it's a question but header wasn't drawn (fallback)
-          if (!headerDrawnForSection) {
-            pdf.setFontSize(10);
-            pdf.setFont("helvetica", "bold");
-            pdf.setFillColor(230, 230, 230);
-            pdf.setDrawColor(200, 200, 200);
-            pdf.setLineWidth(0.1);
-            pdf.rect(margin, yPos, contentWidth, 8, "FD");
-            pdf.text("ITEM", margin + 2, yPos + 5);
-            pdf.text("PERGUNTA", margin + 14, yPos + 5);
-            pdf.text("RESPOSTA", margin + 114, yPos + 5);
-            yPos += 8;
-            headerDrawnForSection = true;
-          }
-
-          // Question rows in table
-          const resposta = respostas[campo.id];
-          const outrosText = respostas[`${campo.id}_outros_text`];
-          let respostaText = "---";
-
-          if (campo.tipo === "foto" && Array.isArray(resposta) && resposta.length > 0) {
-            respostaText = `${resposta.length} foto(s) anexada(s)`;
-          } else if (Array.isArray(resposta)) {
-            respostaText = resposta.join(", ");
-            if (outrosText) {
-              respostaText += ` (${outrosText})`;
-            }
-          } else if (resposta !== undefined && resposta !== null && resposta !== "") {
-            respostaText = String(resposta);
-          }
-
-          // Draw table borders
-          pdf.setDrawColor(200, 200, 200);
-          pdf.setLineWidth(0.1);
-
-          // Calculate row height based on content
-          pdf.setFontSize(8);
-          pdf.setFont("helvetica", "normal");
-          const perguntaLines = pdf.splitTextToSize(campo.label, 96);
-          const respostaLines = pdf.splitTextToSize(respostaText, contentWidth - 116);
-          const rowHeight = Math.max(perguntaLines.length, respostaLines.length) * 4 + 3;
-
-          // Draw cells
-          const col1W = 12;
-          const col2W = 100;
-          const col3W = contentWidth - 112;
-
-          pdf.rect(margin, yPos, col1W, rowHeight); // Item number column
-          pdf.rect(margin + col1W, yPos, col2W, rowHeight); // Question column
-          pdf.rect(margin + col1W + col2W, yPos, col3W, rowHeight); // Answer column
-
-          // Fill item number
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(8);
-          pdf.text(String(itemNumber), margin + 6, yPos + 4, { align: "center" });
-
-          // Fill question
-          pdf.setFont("helvetica", "normal");
-          pdf.text(perguntaLines, margin + 14, yPos + 3);
-
-          // Fill answer
-          if (campo.tipo === "foto" && Array.isArray(resposta) && resposta.length > 0) {
-            pdf.setTextColor(0, 100, 0);
-            pdf.setFont("helvetica", "bold");
-            pdf.text(respostaText, margin + 114, yPos + 3);
-            pdf.setTextColor(0, 0, 0);
-            pdf.setFont("helvetica", "normal");
-          } else {
-            pdf.text(respostaLines, margin + 114, yPos + 3);
-          }
-
-          yPos += rowHeight;
-          itemNumber++;
-        }
+      await gerarPDFInspecao({
+        logoUrl,
+        companyName,
+        rtCpfCnpj,
+        nomeRT: checklist.responsavel_inspecao || undefined,
+        dataAplicacao: checklist.data_aplicacao,
+        modeloNome: checklist.modelos_checklist?.nome_modelo,
+        secoes: checklist.modelos_checklist?.estrutura_json?.secoes || [],
+        respostas: checklist.respostas_json || {},
+        parecerConclusivo: checklist.parecer_conclusivo,
+        dataProximaInspecao: checklist.data_proxima_inspecao,
+        responsavelInspecao: checklist.responsavel_inspecao,
+        assinaturaRT: checklist.assinatura_rt,
+        assinaturaCliente: checklist.assinatura_cliente,
+        assinaturaTestemunha: checklist.assinatura_testemunha,
+        nomeClienteAssinatura: checklist.nome_cliente_assinatura,
+        nomeTestemunhaAssinatura: checklist.nome_testemunha_assinatura,
+        cliente: {
+          razao_social: checklist.clientes.razao_social,
+          cnpj: checklist.clientes.cnpj,
+          rua: checklist.clientes.rua,
+          bairro: checklist.clientes.bairro,
+          cidade: checklist.clientes.cidade,
+          estado: checklist.clientes.estado,
+          responsavel_legal: checklist.clientes.responsavel_legal,
+        },
       });
 
-      // ADD PHOTOGRAPHIC APPENDIX HERE
-      const allPhotos: { url: string, label: string }[] = [];
-      campos.forEach((campo: any) => {
-        if (campo.tipo === "foto" && Array.isArray(respostas[campo.id])) {
-          respostas[campo.id].forEach((url: string) => {
-            allPhotos.push({ url, label: campo.label });
-          });
-        }
-      });
-
-      if (allPhotos.length > 0) {
-        pdf.addPage();
-        yPos = margin;
-        pdf.setFontSize(16);
-        pdf.setFont("helvetica", "bold");
-        pdf.text("Arquivo Fotográfico", pageWidth / 2, yPos, { align: "center" });
-        yPos += 10;
-        pdf.setDrawColor(200, 200, 200);
-        pdf.line(margin, yPos, pageWidth - margin, yPos);
-        yPos += 10;
-
-        const cols = 4;
-        const spacing = 4;
-        const imgWidth = (contentWidth - (spacing * (cols - 1))) / cols;
-        const imgHeight = imgWidth * 0.75;
-
-        for (let i = 0; i < allPhotos.length; i += cols) {
-          if (yPos + imgHeight + 15 > pageHeight - 30) {
-            pdf.addPage();
-            yPos = margin;
-          }
-
-          for (let j = 0; j < cols && (i + j) < allPhotos.length; j++) {
-            const photo = allPhotos[i + j];
-            const xPos = margin + (j * (imgWidth + spacing));
-
-            try {
-              pdf.addImage(photo.url, "JPEG", xPos, yPos, imgWidth, imgHeight);
-              pdf.setFontSize(6);
-              pdf.setFont("helvetica", "italic");
-              const photoLabelLines = pdf.splitTextToSize(`${i + j + 1}`, imgWidth);
-              pdf.text(photoLabelLines, xPos + (imgWidth / 2), yPos + imgHeight + 3, { align: "center" });
-            } catch (e) {
-              console.error("Error adding photo to PDF:", e);
-            }
-          }
-          yPos += imgHeight + 8;
-        }
-        yPos += 5;
-      }
-
-      // Conclusive opinion
-      if (checklist.parecer_conclusivo) {
-        if (yPos > pageHeight - 50) {
-          pdf.addPage();
-          yPos = margin;
-        }
-        yPos += 5;
-        pdf.setFontSize(10);
-        pdf.setFont("helvetica", "bold");
-        pdf.text("Parecer Conclusivo:", margin, yPos);
-        yPos += 6;
-        pdf.setFont("helvetica", "normal");
-        const parecerLines = pdf.splitTextToSize(checklist.parecer_conclusivo, contentWidth);
-        pdf.text(parecerLines, margin, yPos);
-        yPos += (4 * parecerLines.length) + 8; // Deixa o exato espaço de 2 linhas pro próximo bloco
-      }
-
-      // Next inspection date
-      if (checklist.data_proxima_inspecao) {
-        pdf.setFont("helvetica", "bold");
-        pdf.text("Próxima Inspeção:", margin, yPos);
-        pdf.setFont("helvetica", "normal");
-        pdf.text(format(new Date(checklist.data_proxima_inspecao), "dd/MM/yyyy"), margin + 40, yPos);
-        yPos += 8;
-      }
-
-      // Inspector name
-      if (checklist.responsavel_inspecao) {
-        pdf.setFont("helvetica", "bold");
-        pdf.text("Responsável pela Inspeção:", margin, yPos);
-        pdf.setFont("helvetica", "normal");
-        pdf.text(checklist.responsavel_inspecao, margin + 60, yPos);
-        yPos += 15;
-      }
-
-      // SIGNATURES - Side by side perfectly spaced at the absolute bottom
-      if (checklist.assinatura_rt || checklist.assinatura_cliente || checklist.assinatura_testemunha) {
-        if (yPos > pageHeight - 80) {
-          pdf.addPage();
-        }
-        yPos = pageHeight - 35; // Absolute bottom positioning
-
-        const signatureWidth = 50;
-        const signatureHeight = 20;
-        const spacing = (contentWidth - (signatureWidth * 3)) / 2;
-
-        let xPos = margin;
-
-        // RT Signature
-        if (checklist.assinatura_rt) {
-          pdf.addImage(checklist.assinatura_rt, "PNG", xPos, yPos - signatureHeight, signatureWidth, signatureHeight);
-        }
-        pdf.setDrawColor(0, 0, 0);
-        pdf.line(xPos, yPos + 2, xPos + signatureWidth, yPos + 2);
-        pdf.setFontSize(8);
-        pdf.setFont("helvetica", "bold");
-        pdf.text(checklist.responsavel_inspecao || "RT", xPos + signatureWidth / 2, yPos + 7, { align: "center" });
-        pdf.setFont("helvetica", "normal");
-        pdf.text("Responsável Técnico", xPos + signatureWidth / 2, yPos + 11, { align: "center" });
-        xPos += signatureWidth + spacing;
-
-        // Client Signature
-        if (checklist.assinatura_cliente) {
-          pdf.addImage(checklist.assinatura_cliente, "PNG", xPos, yPos - signatureHeight, signatureWidth, signatureHeight);
-        }
-        pdf.line(xPos, yPos + 2, xPos + signatureWidth, yPos + 2);
-        pdf.setFont("helvetica", "bold");
-        pdf.text(checklist.nome_cliente_assinatura || "Dono/Gerente", xPos + signatureWidth / 2, yPos + 7, { align: "center" });
-        pdf.setFont("helvetica", "normal");
-        pdf.text("Dono do Estabelecimento", xPos + signatureWidth / 2, yPos + 11, { align: "center" });
-        xPos += signatureWidth + spacing;
-
-        // Witness Signature
-        if (checklist.assinatura_testemunha) {
-          pdf.addImage(checklist.assinatura_testemunha, "PNG", xPos, yPos - signatureHeight, signatureWidth, signatureHeight);
-        }
-        pdf.line(xPos, yPos + 2, xPos + signatureWidth, yPos + 2);
-        pdf.setFont("helvetica", "bold");
-        pdf.text(checklist.nome_testemunha_assinatura || "", xPos + signatureWidth / 2, yPos + 7, { align: "center" });
-        pdf.setFont("helvetica", "normal");
-        pdf.text("Testemunha", xPos + signatureWidth / 2, yPos + 11, { align: "center" });
-
-        yPos += signatureHeight + 15;
-      }
-
-      // WATERMARK BRANDED FOOTER - Adds to all pages
-      const pageCount = (pdf as any).internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        pdf.setPage(i);
-        const footerY = pageHeight - 12;
-
-        // Separator Line
-        pdf.setDrawColor(220, 220, 220);
-        pdf.setLineWidth(0.1);
-        pdf.line(margin, footerY - 8, pageWidth - margin, footerY - 8);
-
-        // "Gerado automaticamente por"
-        pdf.setFontSize(6);
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(150, 150, 150);
-        pdf.text("Gerado automaticamente por", pageWidth / 2, footerY - 4, { align: "center" });
-
-        // RT Expert Branding
-        pdf.setFontSize(10);
-        pdf.setTextColor(0, 0, 0);
-        pdf.setFont("helvetica", "bold");
-        const rtWidth = pdf.getTextWidth("RT ");
-        const expertWidth = pdf.getTextWidth("Expert");
-        const totalWidth = rtWidth + expertWidth;
-        const startX = (pageWidth - totalWidth) / 2;
-
-        pdf.text("RT ", startX, footerY);
-
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(59, 130, 246); // Stitch Blue
-        pdf.text("Expert", startX + rtWidth, footerY);
-
-        // Subtitle
-        pdf.setFontSize(5);
-        pdf.setTextColor(160, 160, 160);
-        pdf.setFont("helvetica", "normal");
-        pdf.text("GESTÃO INTELIGENTE", pageWidth / 2, footerY + 3.5, { align: "center" });
-
-        // Page number
-        pdf.setFontSize(6);
-        pdf.setTextColor(180, 180, 180);
-        pdf.text(`Página ${i} de ${pageCount}`, pageWidth - margin, footerY + 3.5, { align: "right" });
-      }
-
-      pdf.save(`Checklist_${checklist.clientes.razao_social}_${format(new Date(checklist.data_aplicacao), "dd-MM-yyyy")}.pdf`);
       toast.success("PDF gerado com sucesso!");
     } catch (error) {
       console.error("Erro ao gerar PDF:", error);
@@ -770,7 +360,7 @@ const ChecklistsProntos = () => {
                       PDF
                     </Button>
                     <Button
-                      onClick={() => handleDelete(checklist.id)}
+                      onClick={() => setDeleteId(checklist.id)}
                       size="sm"
                       variant="ghost"
                       className="h-8 w-8 md:h-9 md:w-9 p-0 text-destructive hover:bg-destructive/10"
@@ -960,6 +550,19 @@ const ChecklistsProntos = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        <ConfirmDialog
+          open={!!deleteId}
+          onOpenChange={(open) => { if (!open) setDeleteId(null); }}
+          title="Excluir checklist?"
+          description="As fotos anexadas também serão apagadas. Esta ação não pode ser desfeita."
+          confirmLabel="Excluir"
+          destructive
+          onConfirm={() => {
+            if (deleteId) handleDelete(deleteId);
+            setDeleteId(null);
+          }}
+        />
       </div>
     </Layout>
   );

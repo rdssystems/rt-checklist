@@ -23,7 +23,7 @@ export const getPlanStatus = async (): Promise<PlanStatus> => {
   const now = new Date();
   const trialEnds = profile.trial_ends_at ? new Date(profile.trial_ends_at) : null;
   const trialActive = trialEnds ? trialEnds > now : false;
-  const isPremium = profile.plan_type === 'premium' || trialActive;
+  const isPremium = profile.plan_type === 'premium' || profile.plan_type === 'expert' || trialActive;
 
   return {
     isPremium,

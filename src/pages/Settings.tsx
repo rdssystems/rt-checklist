@@ -6,8 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, Building2, Image as ImageIcon, User, Mail, ShieldCheck, Save, Calendar, CheckCircle2 } from "lucide-react";
+import { Upload, Building2, Image as ImageIcon, User, Mail, ShieldCheck, Save, Calendar, CheckCircle2, AlertTriangle, Trash2 } from "lucide-react";
 import { compressImage } from "@/lib/image-utils";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { toTitleCase } from "@/lib/text-utils";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useGoogleLogin } from '@react-oauth/google';
 import {
   Avatar,
@@ -29,6 +32,12 @@ const Settings = () => {
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const DELETE_CONFIRMATION = "EXCLUIRMINHACONTA";
 
   useEffect(() => {
     loadSettings();
@@ -42,7 +51,7 @@ const Settings = () => {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("company_name, logo_url, nome_rt, email, avatar_url, google_access_token, cpf_cnpj")
+      .select("company_name, logo_url, nome_rt, email, avatar_url, google_access_token, cpf_cnpj, plan_type, trial_ends_at")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -64,7 +73,7 @@ const Settings = () => {
       
       const now = new Date();
       const trialEnds = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
-      setIsPremium(profileData.plan_type === 'premium' || (trialEnds ? trialEnds > now : false));
+      setIsPremium(profileData.plan_type === 'premium' || profileData.plan_type === 'expert' || (trialEnds ? trialEnds > now : false));
     }
   };
 
@@ -143,9 +152,9 @@ const Settings = () => {
     setLoading(true);
 
     const dataToUpdate = {
-      company_name: companyName || null,
+      company_name: companyName ? toTitleCase(companyName) : null,
       logo_url: logoUrl || null,
-      nome_rt: nomeRT || null,
+      nome_rt: nomeRT ? toTitleCase(nomeRT) : null,
       avatar_url: avatarUrl || null,
       cpf_cnpj: cpfCnpj || null,
     };
@@ -236,6 +245,27 @@ const Settings = () => {
       toast.error("Erro ao desconectar");
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== DELETE_CONFIRMATION) {
+      toast.error(`Digite ${DELETE_CONFIRMATION} exatamente como mostrado para confirmar`);
+      return;
+    }
+
+    setDeletingAccount(true);
+    try {
+      const { error } = await supabase.functions.invoke('delete-account');
+      if (error) throw error;
+
+      toast.success("Conta excluída. Sentiremos sua falta!");
+      await supabase.auth.signOut();
+      window.location.href = "/auth";
+    } catch (error) {
+      console.error("Erro ao excluir conta:", error);
+      toast.error("Erro ao excluir a conta. Tente novamente ou contate o suporte.");
+      setDeletingAccount(false);
     }
   };
 
@@ -521,6 +551,117 @@ const Settings = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* DANGER ZONE — Exclusão de conta (LGPD, Art. 18) */}
+        <Card className="mt-6 border-destructive/30 shadow-sm overflow-hidden">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Zona de Perigo
+            </CardTitle>
+            <CardDescription>
+              Excluir sua conta remove permanentemente todos os seus dados, conforme previsto na
+              Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+              <div className="text-sm text-slate-600 dark:text-slate-400">
+                <p className="font-semibold text-slate-900 dark:text-white mb-1">Excluir minha conta</p>
+                <p>
+                  Serão apagados: seu perfil, clientes, modelos, checklists aplicados,
+                  fotos, logotipo e agendamentos. <strong>Esta ação não pode ser desfeita.</strong>
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                className="shrink-0 h-11"
+                onClick={() => setDeleteAccountOpen(true)}
+                disabled={deletingAccount}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {deletingAccount ? "Excluindo..." : "Excluir Conta"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <ConfirmDialog
+          open={deleteAccountOpen}
+          onOpenChange={setDeleteAccountOpen}
+          title="Excluir sua conta permanentemente?"
+          description="Todos os seus dados serão apagados de forma definitiva: perfil, clientes, modelos de checklist, inspeções realizadas, fotos e agendamentos. Não há como recuperar depois. Deseja continuar?"
+          confirmLabel="Sim, excluir tudo"
+          cancelLabel="Cancelar"
+          destructive
+          onConfirm={() => {
+            setDeleteAccountOpen(false);
+            setDeleteConfirmText("");
+            setConfirmDialogOpen(true);
+          }}
+        />
+
+        {/* Confirmação final digitando EXCLUIRMINHACONTA */}
+        <Dialog
+          open={confirmDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setConfirmDialogOpen(false);
+              setDeleteConfirmText("");
+            }
+          }}
+        >
+          <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md rounded-xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5" />
+                Confirmação final
+              </DialogTitle>
+              <DialogDescription>
+                Para evitar exclusões acidentais, digite{" "}
+                <span className="font-bold text-destructive">{DELETE_CONFIRMATION}</span>{" "}
+                no campo abaixo para apagar sua conta permanentemente.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-2">
+              <Label htmlFor="delete-confirm" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Digite {DELETE_CONFIRMATION}
+              </Label>
+              <Input
+                id="delete-confirm"
+                type="text"
+                placeholder={DELETE_CONFIRMATION}
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+                autoFocus
+                autoComplete="off"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && deleteConfirmText === DELETE_CONFIRMATION && !deletingAccount) handleDeleteAccount();
+                }}
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setConfirmDialogOpen(false);
+                  setDeleteConfirmText("");
+                }}
+                disabled={deletingAccount}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText !== DELETE_CONFIRMATION || deletingAccount}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {deletingAccount ? "Excluindo..." : "Excluir Definitivamente"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
