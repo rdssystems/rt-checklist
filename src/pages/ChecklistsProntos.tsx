@@ -379,19 +379,20 @@ const ChecklistsProntos = () => {
         {/* View Dialog */}
         <Dialog open={viewingChecklist !== null} onOpenChange={() => setViewingChecklist(null)}>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader className="flex flex-col sm:flex-row sm:items-start sm:justify-between border-b pb-4 gap-4 pr-6">
-              <div>
-                <DialogTitle className="text-xl font-bold uppercase tracking-wider text-primary">
-                  {viewingChecklist?.modelos_checklist.nome_modelo}
-                </DialogTitle>
-                <div className="text-sm mt-1 text-muted-foreground">Relatório de Inspeção</div>
-              </div>
-              {logoUrl && (
-                <div className="flex flex-col sm:items-end">
-                  <img src={logoUrl} alt="Logo" className="h-12 w-auto object-contain rounded-md bg-white border p-1" />
-                  {companyName && <span className="text-xs text-muted-foreground mt-2 font-medium">{companyName}</span>}
+            <DialogHeader className="border-b pb-4 pr-6">
+              <div className="flex items-center gap-4">
+                {logoUrl && (
+                  <img src={logoUrl} alt="Logo" className="h-14 w-auto shrink-0 object-contain rounded-md bg-white border p-1" />
+                )}
+                <div className="min-w-0 text-left">
+                  <DialogTitle className="text-xl font-bold uppercase tracking-wider text-primary">
+                    {viewingChecklist?.modelos_checklist.nome_modelo}
+                  </DialogTitle>
+                  <div className="text-sm mt-1 text-muted-foreground">
+                    Relatório de Inspeção{companyName ? ` · ${companyName}` : ""}
+                  </div>
                 </div>
-              )}
+              </div>
             </DialogHeader>
             {viewingChecklist && (
               <div className="space-y-4">

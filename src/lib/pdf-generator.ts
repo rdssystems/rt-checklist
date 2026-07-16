@@ -22,6 +22,37 @@ export interface PDFGeneratorOptions {
   cliente?: Partial<Cliente> & { razao_social: string; cnpj: string };
 }
 
+const BRAND_BLUE: [number, number, number] = [37, 99, 235];
+
+/** Carrega uma imagem e normaliza via canvas (resolve formato e fornece dimensões reais). */
+const loadImageData = async (
+  url: string,
+  format: "image/png" | "image/jpeg" = "image/jpeg"
+): Promise<{ dataUrl: string; w: number; h: number } | null> => {
+  try {
+    const img = new window.Image();
+    img.crossOrigin = "Anonymous";
+    img.src = url;
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = reject;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    if (format === "image/jpeg") {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    ctx.drawImage(img, 0, 0);
+    return { dataUrl: canvas.toDataURL(format, 0.85), w: img.naturalWidth, h: img.naturalHeight };
+  } catch {
+    return null;
+  }
+};
+
 export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
   const {
     logoUrl,
@@ -48,36 +79,63 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 15;
   const contentWidth = pageWidth - 2 * margin;
+  const footerReserve = 22; // espaço reservado ao rodapé em todas as páginas
+  const contentBottom = pageHeight - footerReserve;
   let yPos = margin;
+
+  // ---------- Helpers de paginação ----------
+
+  /** Nova página com cabeçalho compacto (modelo à esquerda, cliente à direita). */
+  const newPage = () => {
+    pdf.addPage();
+    pdf.setFillColor(...BRAND_BLUE);
+    pdf.rect(0, 0, pageWidth, 2, "F");
+    pdf.setFontSize(7);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(130, 130, 130);
+    pdf.text(modeloNome || "Relatório de Inspeção", margin, margin - 4);
+    if (cliente?.razao_social) {
+      pdf.text(cliente.razao_social, pageWidth - margin, margin - 4, { align: "right" });
+    }
+    pdf.setDrawColor(220, 220, 220);
+    pdf.setLineWidth(0.1);
+    pdf.line(margin, margin - 2, pageWidth - margin, margin - 2);
+    pdf.setTextColor(0, 0, 0);
+    yPos = margin + 3;
+  };
+
+  /** Garante espaço para um bloco de `height` mm; quebra a página se necessário. */
+  const ensureSpace = (height: number): boolean => {
+    if (yPos + height > contentBottom) {
+      newPage();
+      return true;
+    }
+    return false;
+  };
+
+  // ---------- Cabeçalho da primeira página ----------
+
+  pdf.setFillColor(...BRAND_BLUE);
+  pdf.rect(0, 0, pageWidth, 3, "F");
 
   let logoWidth = 30;
   let logoHeight = 15;
+  let logoData: { dataUrl: string; w: number; h: number } | null = null;
   if (logoUrl) {
-    try {
-      const img = new window.Image();
-      img.crossOrigin = "Anonymous";
-      img.src = logoUrl;
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = reject;
-      });
-      const ratio = img.width / img.height;
+    logoData = await loadImageData(logoUrl, "image/png");
+    if (logoData) {
+      const ratio = logoData.w / logoData.h;
       logoHeight = 15;
       logoWidth = 15 * ratio;
       if (logoWidth > 40) {
         logoWidth = 40;
         logoHeight = 40 / ratio;
       }
-    } catch (e) {
-      console.error("Error loading logo dimensions:", e);
-    }
-  }
-
-  if (logoUrl) {
-    try {
-      pdf.addImage(logoUrl, "PNG", margin, yPos, logoWidth, logoHeight);
-    } catch (e) {
-      console.error("Error adding logo:", e);
+      try {
+        pdf.addImage(logoData.dataUrl, "PNG", margin, yPos, logoWidth, logoHeight);
+      } catch (e) {
+        console.error("Error adding logo:", e);
+      }
     }
   }
 
@@ -99,7 +157,7 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
   const dateStr = dataAplicacao || new Date().toLocaleDateString("pt-BR");
   pdf.text(dateStr, pageWidth - margin, yPos + (rtCpfCnpj ? 8 : 5), { align: "right" });
 
-  yPos += 12;
+  yPos += Math.max(12, logoHeight + 3);
 
   pdf.setFontSize(20);
   pdf.setFont("helvetica", "bold");
@@ -117,8 +175,10 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
   pdf.line(margin, yPos, pageWidth - margin, yPos);
   yPos += 6;
 
+  // ---------- Box do cliente ----------
+
   if (cliente) {
-    pdf.setFillColor(245, 245, 245);
+    pdf.setFillColor(245, 247, 250);
     const hasResponsavel = cliente.responsavel_legal;
     const boxHeight = hasResponsavel ? 24 : 18;
     pdf.rect(margin, yPos, contentWidth, boxHeight, "F");
@@ -159,6 +219,8 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
     yPos += 6;
   }
 
+  // ---------- Tabela de itens ----------
+
   const campos = secoes.flatMap((secao) => {
     const result: Array<{ tipo: string; label: string; id: string }> = [];
     if (secao.titulo) {
@@ -167,66 +229,61 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
     return result.concat((secao.campos || []).map((c) => ({ ...c, tipo: c.tipo })));
   });
 
+  const col1W = 12;
+  const col2W = 100;
+  const col3W = contentWidth - 112;
+
+  const drawTableHeader = () => {
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFillColor(230, 234, 240);
+    pdf.setDrawColor(200, 200, 200);
+    pdf.setLineWidth(0.1);
+    pdf.rect(margin, yPos, contentWidth, 8, "FD");
+    pdf.text("ITEM", margin + 2, yPos + 5);
+    pdf.text("PERGUNTA", margin + 14, yPos + 5);
+    pdf.text("RESPOSTA", margin + 114, yPos + 5);
+    yPos += 8;
+  };
+
   let itemNumber = 1;
+  let rowIndex = 0;
   let headerDrawnForSection = false;
 
   campos.forEach((campo) => {
-    if (yPos > pageHeight - 50) {
-      pdf.addPage();
-      yPos = margin;
-      headerDrawnForSection = false;
-    }
-
     if (campo.tipo === "titulo") {
-      pdf.setFillColor(245, 245, 255);
+      // Título de seção nunca fica órfão: precisa caber título + cabeçalho + 1 linha
+      ensureSpace(8 + 8 + 10);
+      pdf.setFillColor(238, 242, 252);
       pdf.setDrawColor(200, 200, 200);
       pdf.setLineWidth(0.1);
       const titleHeight = 8;
       pdf.rect(margin, yPos, contentWidth, titleHeight, "FD");
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(40, 40, 180);
+      pdf.setTextColor(...BRAND_BLUE);
       pdf.text(campo.label, margin + 2, yPos + 5);
       pdf.setTextColor(0, 0, 0);
       yPos += titleHeight;
 
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFillColor(230, 230, 230);
-      pdf.rect(margin, yPos, contentWidth, 8, "FD");
-      pdf.text("ITEM", margin + 2, yPos + 5);
-      pdf.text("PERGUNTA", margin + 14, yPos + 5);
-      pdf.text("RESPOSTA", margin + 114, yPos + 5);
-      yPos += 8;
+      drawTableHeader();
       headerDrawnForSection = true;
+      rowIndex = 0;
     } else if (campo.tipo === "descricao") {
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "italic");
+      const descLines = pdf.splitTextToSize(campo.label, contentWidth - 4);
+      const descHeight = descLines.length * 4 + 2;
+      ensureSpace(descHeight);
       pdf.setFillColor(250, 250, 250);
       pdf.setDrawColor(200, 200, 200);
       pdf.setLineWidth(0.1);
-      pdf.setFontSize(8);
-      pdf.setFont("helvetica", "italic");
       pdf.setTextColor(100, 100, 100);
-      const descLines = pdf.splitTextToSize(campo.label, contentWidth - 4);
-      const descHeight = descLines.length * 4 + 2;
       pdf.rect(margin, yPos, contentWidth, descHeight, "FD");
       pdf.text(descLines, margin + 2, yPos + 3);
       pdf.setTextColor(0, 0, 0);
       yPos += descHeight;
     } else {
-      if (!headerDrawnForSection) {
-        pdf.setFontSize(10);
-        pdf.setFont("helvetica", "bold");
-        pdf.setFillColor(230, 230, 230);
-        pdf.setDrawColor(200, 200, 200);
-        pdf.setLineWidth(0.1);
-        pdf.rect(margin, yPos, contentWidth, 8, "FD");
-        pdf.text("ITEM", margin + 2, yPos + 5);
-        pdf.text("PERGUNTA", margin + 14, yPos + 5);
-        pdf.text("RESPOSTA", margin + 114, yPos + 5);
-        yPos += 8;
-        headerDrawnForSection = true;
-      }
-
       const resposta = respostas[campo.id];
       const outrosText = respostas[`${campo.id}_outros_text`] as string | undefined;
       let respostaText = "---";
@@ -247,19 +304,27 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
         respostaText += `\nObs: ${observacao}`;
       }
 
-      pdf.setDrawColor(200, 200, 200);
-      pdf.setLineWidth(0.1);
-
+      // Mede a linha ANTES de desenhar, para quebrar página só quando necessário
       pdf.setFontSize(8);
       pdf.setFont("helvetica", "normal");
       const perguntaLines = pdf.splitTextToSize(campo.label, 96);
       const respostaLines = pdf.splitTextToSize(respostaText, contentWidth - 116);
       const rowHeight = Math.max(perguntaLines.length, respostaLines.length) * 4 + 3;
 
-      const col1W = 12;
-      const col2W = 100;
-      const col3W = contentWidth - 112;
+      const brokePage = ensureSpace(rowHeight + (headerDrawnForSection ? 0 : 8));
+      if (brokePage || !headerDrawnForSection) {
+        drawTableHeader();
+        headerDrawnForSection = true;
+      }
 
+      // Zebra: fundo alternado para leitura
+      if (rowIndex % 2 === 1) {
+        pdf.setFillColor(247, 249, 252);
+        pdf.rect(margin, yPos, contentWidth, rowHeight, "F");
+      }
+
+      pdf.setDrawColor(200, 200, 200);
+      pdf.setLineWidth(0.1);
       pdf.rect(margin, yPos, col1W, rowHeight);
       pdf.rect(margin + col1W, yPos, col2W, rowHeight);
       pdf.rect(margin + col1W + col2W, yPos, col3W, rowHeight);
@@ -271,20 +336,31 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
       pdf.setFont("helvetica", "normal");
       pdf.text(perguntaLines, margin + 14, yPos + 3);
 
+      // Cor da resposta: Sim (verde), Não (vermelho), N.A (cinza), fotos (verde escuro)
+      const firstAnswer = String(respostaText).split("\n")[0].trim();
       if (campo.tipo === "foto" && Array.isArray(resposta) && resposta.length > 0) {
         pdf.setTextColor(0, 100, 0);
         pdf.setFont("helvetica", "bold");
-        pdf.text(respostaText, margin + 114, yPos + 3);
-        pdf.setTextColor(0, 0, 0);
-        pdf.setFont("helvetica", "normal");
-      } else {
-        pdf.text(respostaLines, margin + 114, yPos + 3);
+      } else if (/^sim\b/i.test(firstAnswer)) {
+        pdf.setTextColor(22, 130, 60);
+        pdf.setFont("helvetica", "bold");
+      } else if (/^n[ãa]o\b/i.test(firstAnswer)) {
+        pdf.setTextColor(190, 30, 30);
+        pdf.setFont("helvetica", "bold");
+      } else if (/^n\.?a\b/i.test(firstAnswer)) {
+        pdf.setTextColor(120, 120, 120);
       }
+      pdf.text(respostaLines, margin + 114, yPos + 3);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFont("helvetica", "normal");
 
       yPos += rowHeight;
       itemNumber++;
+      rowIndex++;
     }
   });
+
+  // ---------- Arquivo fotográfico ----------
 
   const allPhotos: { url: string; label: string }[] = [];
   campos.forEach((campo) => {
@@ -298,66 +374,104 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
   if (allPhotos.length > 0) {
     // Bucket privado: converte para URLs assinadas antes de embutir no PDF
     const signedUrls = await signPhotoUrls(allPhotos.map((p) => p.url));
-    allPhotos.forEach((p, i) => {
-      p.url = signedUrls[i];
-    });
+    const loadedPhotos = await Promise.all(
+      signedUrls.map((url) => loadImageData(url, "image/jpeg"))
+    );
 
-    pdf.addPage();
-    yPos = margin;
-    pdf.setFontSize(16);
+    // Grid adaptativo: poucas fotos ganham células maiores
+    const cols = allPhotos.length <= 4 ? 2 : 3;
+    const spacing = 5;
+    const cellWidth = (contentWidth - spacing * (cols - 1)) / cols;
+    const cellHeight = cellWidth * 0.75;
+    const captionHeight = 7;
+    const rowBlockHeight = cellHeight + captionHeight + 4;
+
+    // Continua na mesma página se couber o título + 1 linha de fotos
+    ensureSpace(16 + rowBlockHeight);
+
+    yPos += 4;
+    pdf.setFontSize(14);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Arquivo Fotográfico", pageWidth / 2, yPos, { align: "center" });
-    yPos += 10;
-    pdf.setDrawColor(200, 200, 200);
-    pdf.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 10;
-
-    const cols = 4;
-    const spacing = 4;
-    const imgWidth = (contentWidth - (spacing * (cols - 1))) / cols;
-    const imgHeight = imgWidth * 0.75;
+    pdf.text("Arquivo Fotográfico", margin, yPos);
+    yPos += 4;
+    pdf.setDrawColor(...BRAND_BLUE);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, yPos, margin + 45, yPos);
+    pdf.setLineWidth(0.1);
+    yPos += 6;
 
     for (let i = 0; i < allPhotos.length; i += cols) {
-      if (yPos + imgHeight + 15 > pageHeight - 30) {
-        pdf.addPage();
-        yPos = margin;
-      }
+      ensureSpace(rowBlockHeight);
 
-      for (let j = 0; j < cols && (i + j) < allPhotos.length; j++) {
-        const photo = allPhotos[i + j];
-        const xPos = margin + (j * (imgWidth + spacing));
+      for (let j = 0; j < cols && i + j < allPhotos.length; j++) {
+        const idx = i + j;
+        const photo = allPhotos[idx];
+        const loaded = loadedPhotos[idx];
+        const xPos = margin + j * (cellWidth + spacing);
 
-        try {
-          pdf.addImage(photo.url, "JPEG", xPos, yPos, imgWidth, imgHeight);
-          pdf.setFontSize(6);
-          pdf.setFont("helvetica", "italic");
-          pdf.text(`${i + j + 1}`, xPos + (imgWidth / 2), yPos + imgHeight + 3, { align: "center" });
-        } catch (e) {
-          console.error("Error adding photo to PDF:", e);
+        // Moldura da célula
+        pdf.setDrawColor(210, 210, 210);
+        pdf.rect(xPos, yPos, cellWidth, cellHeight);
+
+        if (loaded) {
+          // Encaixa preservando a proporção (sem esticar)
+          const ratio = loaded.w / loaded.h;
+          let drawW = cellWidth - 2;
+          let drawH = drawW / ratio;
+          if (drawH > cellHeight - 2) {
+            drawH = cellHeight - 2;
+            drawW = drawH * ratio;
+          }
+          const offX = xPos + (cellWidth - drawW) / 2;
+          const offY = yPos + (cellHeight - drawH) / 2;
+          try {
+            pdf.addImage(loaded.dataUrl, "JPEG", offX, offY, drawW, drawH);
+          } catch (e) {
+            console.error("Error adding photo to PDF:", e);
+          }
+        } else {
+          pdf.setFontSize(7);
+          pdf.setTextColor(150, 150, 150);
+          pdf.text("Foto indisponível", xPos + cellWidth / 2, yPos + cellHeight / 2, { align: "center" });
+          pdf.setTextColor(0, 0, 0);
         }
+
+        // Legenda com o item de origem
+        pdf.setFontSize(6.5);
+        pdf.setFont("helvetica", "italic");
+        pdf.setTextColor(90, 90, 90);
+        const caption = pdf.splitTextToSize(`Foto ${idx + 1} — ${photo.label}`, cellWidth)[0];
+        pdf.text(caption, xPos + cellWidth / 2, yPos + cellHeight + 4, { align: "center" });
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFont("helvetica", "normal");
       }
-      yPos += imgHeight + 8;
+      yPos += rowBlockHeight;
     }
-    yPos += 5;
+    yPos += 2;
   }
 
+  // ---------- Parecer conclusivo (paginado linha a linha) ----------
+
   if (parecerConclusivo) {
-    if (yPos > pageHeight - 50) {
-      pdf.addPage();
-      yPos = margin;
-    }
+    ensureSpace(16);
     yPos += 5;
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.text("Parecer Conclusivo:", margin, yPos);
     yPos += 6;
     pdf.setFont("helvetica", "normal");
-    const parecerLines = pdf.splitTextToSize(parecerConclusivo, contentWidth);
-    pdf.text(parecerLines, margin, yPos);
-    yPos += (4 * parecerLines.length) + 8;
+    const parecerLines: string[] = pdf.splitTextToSize(parecerConclusivo, contentWidth);
+    for (const line of parecerLines) {
+      ensureSpace(5);
+      pdf.text(line, margin, yPos);
+      yPos += 4.5;
+    }
+    yPos += 6;
   }
 
   if (dataProximaInspecao) {
+    ensureSpace(10);
+    pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.text("Próxima Inspeção:", margin, yPos);
     pdf.setFont("helvetica", "normal");
@@ -366,7 +480,9 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
   }
 
   if (responsavelInspecao || nomeRT) {
+    ensureSpace(14);
     const nome = responsavelInspecao || nomeRT || "";
+    pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.text("Responsável pela Inspeção:", margin, yPos);
     pdf.setFont("helvetica", "normal");
@@ -374,17 +490,19 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
     yPos += 12;
   }
 
+  // ---------- Assinaturas ----------
+
   if (assinaturaRT || assinaturaCliente || assinaturaTestemunha) {
-    if (yPos > pageHeight - 65) {
-      pdf.addPage();
-      yPos = margin + 10;
+    if (yPos + 45 > contentBottom) {
+      newPage();
+      yPos += 8;
     } else {
-      yPos += 12;
+      yPos += 10;
     }
 
     const signatureWidth = 50;
     const signatureHeight = 18;
-    const spacing = (contentWidth - (signatureWidth * 3)) / 2;
+    const spacing = (contentWidth - signatureWidth * 3) / 2;
 
     let xPos = margin;
 
@@ -424,6 +542,8 @@ export async function gerarPDFInspecao(options: PDFGeneratorOptions) {
 
     yPos += signatureHeight + 15;
   }
+
+  // ---------- Rodapé em todas as páginas ----------
 
   const pageCount = (pdf as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
