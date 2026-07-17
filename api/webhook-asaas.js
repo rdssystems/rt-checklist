@@ -6,8 +6,8 @@ export default async function handler(req, res) {
   }
 
   // Validação de Token de Segurança (vinda do painel do Asaas)
-  const asaasToken = req.headers['asaas-access-token']; 
-  const EXPECTED_TOKEN = 'whsec_L25w30k4u1cNQ0AX1m53tVPb5-W5xyJVpO8ETwMtD44';
+  const asaasToken = req.headers['asaas-access-token'];
+  const EXPECTED_TOKEN = process.env.ASAAS_WEBHOOK_TOKEN || 'whsec_L25w30k4u1cNQ0AX1m53tVPb5-W5xyJVpO8ETwMtD44';
 
   if (asaasToken !== EXPECTED_TOKEN) {
     console.error('Webhook Asaas: Token de autenticação inválido');
@@ -43,26 +43,28 @@ export default async function handler(req, res) {
       const isSubscription = !!payment?.subscription || event.startsWith('SUBSCRIPTION');
       
       if (isSubscription) {
-        // Se for assinatura, plano 'premium' (Expert) por tempo indeterminado enquanto pagar
+        // Assinatura recorrente: premium sem data de expiração (cancelamento/inadimplência revertem)
         const { error } = await supabase
           .from('profiles')
-          .update({ 
+          .update({
             plan_type: 'premium',
+            plan_expires_at: null,
             subscription_id: payment?.subscription || subscription?.id
           })
           .eq('id', userId);
-        
+
         if (error) throw error;
       } else {
-        // Se for pagamento avulso (PIX/Boleto), adicionamos 30 dias na validade
+        // Pagamento avulso (PIX/Boleto): premium válido por 30 dias via plan_expires_at
+        // (antes usava trial_ends_at, o que deixava o plano ativo para sempre)
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30);
 
         const { error } = await supabase
           .from('profiles')
-          .update({ 
+          .update({
             plan_type: 'premium',
-            trial_ends_at: expiresAt.toISOString()
+            plan_expires_at: expiresAt.toISOString()
           })
           .eq('id', userId);
 
@@ -82,8 +84,9 @@ export default async function handler(req, res) {
     if (cancelEvents.includes(event)) {
       await supabase
         .from('profiles')
-        .update({ 
-          plan_type: 'free'
+        .update({
+          plan_type: 'free',
+          plan_expires_at: null
         })
         .eq('id', userId);
       

@@ -69,8 +69,6 @@ const Auth = () => {
         emailRedirectTo: `${window.location.origin}/auth`,
         data: {
           nome_rt: nomeRT,
-          plan_type: 'premium',
-          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           terms_accepted_at: new Date().toISOString()
         }
       }

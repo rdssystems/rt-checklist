@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toTitleCase } from "@/lib/text-utils";
+import { getPlanStatus, checkClientesLimit } from "@/lib/plan-limits";
 import type { Cliente } from "@/types";
 
 const Clientes = () => {
@@ -31,15 +32,8 @@ const Clientes = () => {
   }, []);
 
   const fetchClientes = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase.from("profiles").select("plan_type, trial_ends_at").eq("id", user.id).single();
-      if (profile) {
-        const now = new Date();
-        const trialEnds = profile.trial_ends_at ? new Date(profile.trial_ends_at) : null;
-        setIsPremium(profile.plan_type === 'premium' || profile.plan_type === 'expert' || (trialEnds ? trialEnds > now : false));
-      }
-    }
+    const status = await getPlanStatus();
+    setIsPremium(status.isPremium);
 
     const { data, error } = await supabase
       .from("clientes")
@@ -182,6 +176,17 @@ const Clientes = () => {
     if (!formData.razao_social || !formData.cnpj) {
       toast.error("Razão Social e CNPJ são obrigatórios");
       return;
+    }
+
+    // Limite de clientes no plano Free (somente para novos cadastros)
+    if (!editingId) {
+      const { canCreate, limite } = await checkClientesLimit();
+      if (!canCreate) {
+        toast.error(`Limite de ${limite} clientes no plano Free atingido.`, {
+          description: "Assine o plano Expert para cadastrar clientes ilimitados.",
+        });
+        return;
+      }
     }
 
     setLoading(true);

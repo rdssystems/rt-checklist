@@ -188,10 +188,11 @@ const AplicarChecklist = () => {
     if ((!files || files.length === 0) && !singleBlob) return;
     if (!user) return;
 
-    // Limite de fotos por checklist conforme o plano (free: 5 / premium: 10)
-    const { getPlanStatus } = await import("@/lib/plan-limits");
+    // Limite de fotos por checklist conforme o plano
+    const { getPlanStatus, getLimitsFor } = await import("@/lib/plan-limits");
     const planStatus = await getPlanStatus();
-    const maxFotos = planStatus.isPremium ? 10 : 5;
+    const limits = getLimitsFor(planStatus);
+    const maxFotos = limits.fotosPorChecklist;
     const fotosAtuais = contarFotosDoChecklist();
     const slotsRestantes = maxFotos - fotosAtuais;
 
@@ -220,8 +221,8 @@ const AplicarChecklist = () => {
 
         // Free comprime mais para economizar armazenamento
         const compressedBlob = await compressImage(item as File | Blob, {
-          maxWidth: planStatus.isPremium ? 1024 : 800,
-          quality: planStatus.isPremium ? 0.7 : 0.6
+          maxWidth: limits.fotoMaxWidth,
+          quality: limits.fotoQuality
         });
 
         const fileExt = "jpg";
@@ -307,11 +308,11 @@ const AplicarChecklist = () => {
 
     // Import dinâmico da lógica de limites
     const { checkChecklistLimit } = await import("@/lib/plan-limits");
-    const { canCreate, total } = await checkChecklistLimit();
-    
+    const { canCreate, total, limite } = await checkChecklistLimit();
+
     if (!canCreate) {
       toast.error("Limite mensal atingido!", {
-        description: `Você já utilizou seus 5 checklists mensais do plano gratuito (${total}/5). Faça upgrade para ilimitado.`,
+        description: `Você já utilizou seus ${limite} checklists mensais do plano gratuito (${total}/${limite}). Faça upgrade para ilimitado.`,
         duration: 6000
       });
       setLoading(false);

@@ -10,6 +10,7 @@ import { Upload, Building2, Image as ImageIcon, User, Mail, ShieldCheck, Save, C
 import { compressImage } from "@/lib/image-utils";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toTitleCase } from "@/lib/text-utils";
+import { getPlanStatus } from "@/lib/plan-limits";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useGoogleLogin } from '@react-oauth/google';
 import {
@@ -122,10 +123,9 @@ const Settings = () => {
       setAvatarUrl(profileData.avatar_url || "");
       setGoogleConnected(!!profileData.google_access_token);
       setCpfCnpj(profileData.cpf_cnpj || "");
-      
-      const now = new Date();
-      const trialEnds = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
-      setIsPremium(profileData.plan_type === 'premium' || profileData.plan_type === 'expert' || (trialEnds ? trialEnds > now : false));
+
+      const status = await getPlanStatus();
+      setIsPremium(status.isPremium);
     }
   };
 

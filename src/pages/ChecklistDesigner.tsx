@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useIsMobile } from "@/hooks/use-mobile";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toTitleCase, toSentenceCase } from "@/lib/text-utils";
+import { checkModelosLimit } from "@/lib/plan-limits";
 import { toast } from "sonner";
 
 // Breakpoint em que o editor troca das 3 colunas fixas para o layout mobile (toolbar + sheet)
@@ -234,6 +235,17 @@ const ChecklistDesigner = () => {
     if (!nomeModelo.trim()) {
       toast.error("Digite um nome para o modelo no cabeçalho.");
       return;
+    }
+
+    // Limite de modelos no plano Free (somente para modelos novos)
+    if (!editingId) {
+      const { canCreate, limite } = await checkModelosLimit();
+      if (!canCreate) {
+        toast.error(`Limite de ${limite} modelos no plano Free atingido.`, {
+          description: "Assine o plano Expert para criar modelos ilimitados.",
+        });
+        return;
+      }
     }
 
     setLoading(true);

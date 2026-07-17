@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { computePlanStatus } from "@/lib/plan-limits";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,17 +100,14 @@ const Layout = ({ children }: LayoutProps) => {
   const loadSettings = async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("company_name, logo_url, nome_rt, avatar_url, plan_type, trial_ends_at")
+      .select("company_name, logo_url, nome_rt, avatar_url, plan_type, trial_ends_at, plan_expires_at")
       .eq("id", userId)
       .maybeSingle();
 
     const profileData = data as any;
 
     if (profileData) {
-      const now = new Date();
-      const trialEnds = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
-      const trialActive = trialEnds ? trialEnds > now : false;
-      const daysLeft = trialEnds ? Math.max(0, Math.ceil((trialEnds.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+      const status = computePlanStatus(profileData);
 
       const fresh: CachedProfile = {
         companyName: profileData.company_name || "RT-Expert",
@@ -117,9 +115,9 @@ const Layout = ({ children }: LayoutProps) => {
         userName: profileData.nome_rt || "Usuário",
         avatarUrl: profileData.avatar_url || "",
         planStatus: {
-          isPremium: profileData.plan_type === 'premium' || profileData.plan_type === 'expert' || trialActive,
-          planType: profileData.plan_type || 'free',
-          daysLeft
+          isPremium: status.isPremium,
+          planType: status.planType,
+          daysLeft: status.daysLeft
         }
       };
 

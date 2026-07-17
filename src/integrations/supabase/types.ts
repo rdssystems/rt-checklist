@@ -255,6 +255,7 @@ export type Database = {
           logo_url: string | null
           nome_rt: string
           nomination_limit: number | null
+          plan_expires_at: string | null
           plan_type: string | null
           subscription_id: string | null
           trial_ends_at: string | null
@@ -272,6 +273,7 @@ export type Database = {
           logo_url?: string | null
           nome_rt: string
           nomination_limit?: number | null
+          plan_expires_at?: string | null
           plan_type?: string | null
           subscription_id?: string | null
           trial_ends_at?: string | null
@@ -289,6 +291,7 @@ export type Database = {
           logo_url?: string | null
           nome_rt?: string
           nomination_limit?: number | null
+          plan_expires_at?: string | null
           plan_type?: string | null
           subscription_id?: string | null
           trial_ends_at?: string | null

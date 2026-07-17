@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { PlanStatus } from "@/types";
+import { computePlanStatus } from "@/lib/plan-limits";
 
 interface AuthContextValue {
   user: User | null;
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = async (userId: string) => {
     const { data } = await supabase
       .from("profiles")
-      .select("id, nome_rt, email, company_name, logo_url, avatar_url, plan_type, trial_ends_at, cpf_cnpj, nomination_limit")
+      .select("id, nome_rt, email, company_name, logo_url, avatar_url, plan_type, trial_ends_at, plan_expires_at, cpf_cnpj, nomination_limit")
       .eq("id", userId)
       .maybeSingle();
 
@@ -45,15 +46,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (profileData) {
       setProfile(profileData as AuthContextValue["profile"]);
 
-      const now = new Date();
-      const trialEnds = profileData.trial_ends_at ? new Date(profileData.trial_ends_at as string) : null;
-      const isPremium = (profileData.plan_type === "premium" || profileData.plan_type === "expert") || (trialEnds ? trialEnds > now : false);
-      const daysLeft = trialEnds ? Math.max(0, Math.ceil((trialEnds.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))) : 0;
-
+      const status = computePlanStatus(profileData as Parameters<typeof computePlanStatus>[0]);
       setPlanStatus({
-        isPremium,
-        planType: (profileData.plan_type as string) || "free",
-        daysLeft,
+        isPremium: status.isPremium,
+        planType: status.planType,
+        daysLeft: status.daysLeft,
       });
     }
   };
