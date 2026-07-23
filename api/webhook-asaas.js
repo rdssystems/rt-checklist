@@ -15,22 +15,26 @@ export default async function handler(req, res) {
   }
   
   const { event, payment, subscription } = req.body;
-  const userId = payment?.externalReference || subscription?.externalReference;
+  const rawRef = payment?.externalReference || subscription?.externalReference;
 
-  if (!userId) {
-    console.log('Webhook Asaas: Evento recebido sem userId (externalReference)');
+  if (!rawRef) {
+    console.log('Webhook Asaas: Evento recebido sem externalReference');
     return res.status(200).json({ status: 'ignored' });
   }
 
+  // Desestruturar userId e planTier (ex: "uuid:drive" ou "uuid:cloud")
+  const [userId, tierExt] = rawRef.includes(':') ? rawRef.split(':') : [rawRef, 'cloud'];
+  const planTier = ['drive', 'cloud', 'enterprise'].includes(tierExt) ? tierExt : 'cloud';
+  const storageProvider = planTier === 'drive' ? 'google_drive' : 'supabase';
+
   const supabase = createClient(
     process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY // Precisamos da role de serviço para ignorar RLS
+    process.env.SUPABASE_SERVICE_ROLE_KEY
   );
 
   try {
-    console.log(`Recebido evento Asaas: ${event} para o usuário ${userId}`);
+    console.log(`Recebido evento Asaas: ${event} para o usuário ${userId} (Plano: ${planTier})`);
 
-    // Lista de eventos que confirmam pagamento ou renovação
     const confirmedEvents = [
       'PAYMENT_CONFIRMED',
       'PAYMENT_RECEIVED',
@@ -39,15 +43,15 @@ export default async function handler(req, res) {
     ];
 
     if (confirmedEvents.includes(event)) {
-      // 1. Identificar se é Assinatura Recorrente ou Pagamento Único
       const isSubscription = !!payment?.subscription || event.startsWith('SUBSCRIPTION');
       
       if (isSubscription) {
-        // Assinatura recorrente: premium sem data de expiração (cancelamento/inadimplência revertem)
         const { error } = await supabase
           .from('profiles')
           .update({
             plan_type: 'premium',
+            plan_tier: planTier,
+            storage_provider: storageProvider,
             plan_expires_at: null,
             subscription_id: payment?.subscription || subscription?.id
           })
@@ -55,8 +59,6 @@ export default async function handler(req, res) {
 
         if (error) throw error;
       } else {
-        // Pagamento avulso (PIX/Boleto): premium válido por 30 dias via plan_expires_at
-        // (antes usava trial_ends_at, o que deixava o plano ativo para sempre)
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30);
 
@@ -64,6 +66,8 @@ export default async function handler(req, res) {
           .from('profiles')
           .update({
             plan_type: 'premium',
+            plan_tier: planTier,
+            storage_provider: storageProvider,
             plan_expires_at: expiresAt.toISOString()
           })
           .eq('id', userId);
@@ -71,10 +75,9 @@ export default async function handler(req, res) {
         if (error) throw error;
       }
 
-      console.log(`Plano Expert ativado/renovado para o usuário: ${userId}`);
+      console.log(`Plano ${planTier.toUpperCase()} ativado/renovado para o usuário: ${userId}`);
     }
 
-    // Eventos de cancelamento ou falha
     const cancelEvents = [
       'SUBSCRIPTION_DELETED',
       'PAYMENT_OVERDUE',
@@ -86,6 +89,8 @@ export default async function handler(req, res) {
         .from('profiles')
         .update({
           plan_type: 'free',
+          plan_tier: 'free',
+          storage_provider: 'supabase',
           plan_expires_at: null
         })
         .eq('id', userId);

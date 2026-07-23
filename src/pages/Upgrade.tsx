@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Sparkles, Zap, ShieldCheck, Map, Calendar, FileText, Smartphone, Loader2 } from "lucide-react";
+import { Check, Sparkles, Zap, ShieldCheck, Map, Calendar, FileText, Smartphone, Loader2, HardDrive, Cloud } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
 import { useState, useEffect } from "react";
-import { getPlanStatus, type PlanStatus } from "@/lib/plan-limits";
+import { getPlanStatus, type PlanStatus, type PlanTier } from "@/lib/plan-limits";
 import { supabase } from "@/integrations/supabase/client";
 
 const Upgrade = () => {
@@ -27,7 +27,7 @@ const Upgrade = () => {
   const [paying, setPaying] = useState(false);
   const [showCpfDialog, setShowCpfDialog] = useState(false);
   const [tempCpf, setTempCpf] = useState("");
-  const [pendingPlanType, setPendingPlanType] = useState<'RECURRING' | 'SINGLE' | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<{ type: 'RECURRING' | 'SINGLE'; planTier: PlanTier } | null>(null);
   const [savingCpf, setSavingCpf] = useState(false);
 
   useEffect(() => {
@@ -37,10 +37,10 @@ const Upgrade = () => {
     });
   }, []);
 
-  const handleSubscription = async (type: 'RECURRING' | 'SINGLE') => {
+  const handleSubscription = async (type: 'RECURRING' | 'SINGLE', planTier: PlanTier = 'cloud') => {
     setPaying(true);
     try {
-      const { data: { user } } = await (await import("@/integrations/supabase/client")).supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         toast.error("Você precisa estar logado para assinar");
@@ -55,13 +55,13 @@ const Upgrade = () => {
         .single() as any);
       
       if (!profile?.cpf_cnpj) {
-        setPendingPlanType(type);
+        setPendingCheckout({ type, planTier });
         setShowCpfDialog(true);
         setPaying(false);
         return;
       }
 
-      await executeCheckout(type, user.id, user.email, profile.nome_rt, profile.cpf_cnpj);
+      await executeCheckout(type, planTier, user.id, user.email, profile.nome_rt, profile.cpf_cnpj);
     } catch (error: any) {
       console.error(error);
       toast.error("Erro ao iniciar checkout: " + error.message);
@@ -69,13 +69,21 @@ const Upgrade = () => {
     }
   };
 
-  const executeCheckout = async (type: 'RECURRING' | 'SINGLE', userId: string, email: string | undefined, name: string | null, cpfCnpj: string) => {
+  const executeCheckout = async (
+    type: 'RECURRING' | 'SINGLE',
+    planTier: PlanTier,
+    userId: string,
+    email: string | undefined,
+    name: string | null,
+    cpfCnpj: string
+  ) => {
     try {
       const response = await fetch('/api/asaas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          type, 
+          type,
+          planTier,
           userId,
           email,
           name: name || 'Cliente RT Expert',
@@ -119,8 +127,7 @@ const Upgrade = () => {
       toast.success("Documento salvo com sucesso!");
       setShowCpfDialog(false);
       
-      // Continuar para o pagamento
-      if (pendingPlanType) {
+      if (pendingCheckout) {
         setPaying(true);
         const { data: profile } = await (supabase
           .from("profiles")
@@ -128,7 +135,14 @@ const Upgrade = () => {
           .eq("id", user.id)
           .single() as any);
           
-        await executeCheckout(pendingPlanType, user.id, user.email, profile?.nome_rt, tempCpf);
+        await executeCheckout(
+          pendingCheckout.type,
+          pendingCheckout.planTier,
+          user.id,
+          user.email,
+          profile?.nome_rt,
+          tempCpf
+        );
       }
     } catch (error: any) {
       toast.error("Erro ao salvar documento: " + error.message);
@@ -156,7 +170,7 @@ const Upgrade = () => {
     {
       icon: <ShieldCheck className="w-5 h-5 text-indigo-500" />,
       title: "Consulta Automática de CNPJ",
-      description: "Cadastre clientes em segundos apenas digitando o CNPJ. Dados puxados direto da base oficial."
+      description: "Cadastre clientes em segundos apenas digitando o CNPJ direto da base oficial."
     },
     {
       icon: <Zap className="w-5 h-5 text-purple-500" />,
@@ -182,21 +196,21 @@ const Upgrade = () => {
 
   return (
     <Layout>
-      <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-12 pb-20">
+      <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-12 pb-20">
         <div className="text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mb-2">
             <Sparkles className="w-3.5 h-3.5 fill-primary" />
-            Escolha a Excelência
+            Escolha o Plano Ideal para seu Negócio
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Plano <span className="text-primary italic">RT Expert</span>
+            Planos <span className="text-primary italic">RT Expert</span>
           </h1>
           <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-            A ferramenta definitiva para o Responsável Técnico que busca produtividade, 
-            organização e profissionalismo em cada inspeção.
+            Aumente a produtividade da sua consultoria com laudos em campo, integração Google e escolha o tipo de armazenamento perfeito.
           </p>
         </div>
 
+        {/* Grid de Recursos */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, index) => (
             <Card key={index} className="border-slate-200 dark:border-slate-800 hover:shadow-lg transition-shadow bg-white dark:bg-slate-900/50">
@@ -215,51 +229,131 @@ const Upgrade = () => {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch pt-6">
-          {/* Opção Recorrente */}
+        {/* Seleção de Planos */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch pt-6">
+          
+          {/* Plano DRIVE (BYOS) */}
           <Card className={cn(
-            "relative overflow-hidden border-2 transition-all group",
-            planStatus?.planType === 'premium' ? "border-emerald-500/20 bg-emerald-50/5" : "border-primary shadow-xl shadow-primary/10"
+            "relative overflow-hidden border-2 transition-all group flex flex-col justify-between",
+            planStatus?.planTier === 'drive' ? "border-emerald-500/30 bg-emerald-50/10" : "border-slate-200 dark:border-slate-800 hover:border-emerald-500/50"
           )}>
-            {planStatus?.planType !== 'premium' && (
-              <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-black px-4 py-1 rounded-bl-xl uppercase tracking-widest animate-pulse">
-                Melhor Valor
-              </div>
-            )}
+            <div className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-black px-4 py-1 rounded-bl-xl uppercase tracking-widest">
+              Mais Econômico
+            </div>
+
+            <div>
+              <CardHeader className="text-center pb-2">
+                <div className="mx-auto p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 rounded-full w-fit mb-2">
+                  <HardDrive className="w-6 h-6" />
+                </div>
+                <CardTitle className="text-2xl font-bold">Expert DRIVE</CardTitle>
+                <CardDescription>Use seu Próprio Google Drive (BYOS)</CardDescription>
+              </CardHeader>
+              
+              <CardContent className="text-center py-4">
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-2xl font-bold text-slate-500">R$</span>
+                  <span className="text-5xl font-black tracking-tight text-slate-900 dark:text-white">59</span>
+                  <span className="text-xl font-medium text-slate-500">,90/mês</span>
+                </div>
+                <ul className="mt-6 text-xs text-left space-y-2 text-slate-600 dark:text-slate-400">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Fotos salvas no <strong>seu Google Drive</strong></span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Fotos <strong>Ilimitadas</strong> por vistoria</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Checklists e Clientes ilimitados</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Busca CNPJ + Agenda + Laudos PDF</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </div>
             
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-2xl font-bold">Assinatura Expert</CardTitle>
-              <CardDescription>Plano Recorrente Mensal</CardDescription>
-            </CardHeader>
-            
-            <CardContent className="text-center py-6">
-              <div className="flex items-center justify-center gap-1">
-                <span className="text-2xl font-bold text-slate-500">R$</span>
-                <span className="text-6xl font-black tracking-tight text-slate-900 dark:text-white">80</span>
-                <span className="text-xl font-medium text-slate-500">/mês</span>
-              </div>
-              <p className="mt-4 text-sm text-slate-500 font-medium">
-                No cartão de crédito. <br />
-                Acesso imediato e renovação automática.
-              </p>
-            </CardContent>
-            
-            <CardFooter className="flex flex-col gap-4 pb-10">
-              {planStatus?.planType === 'premium' ? (
-                <div className="w-full h-14 bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500/20 rounded-xl flex items-center justify-center gap-3 text-emerald-600 dark:text-emerald-400 font-bold">
-                  <Check className="w-6 h-6" />
-                  Plano Ativo
+            <CardFooter className="pt-4 pb-6">
+              {planStatus?.planTier === 'drive' && planStatus.isPremium ? (
+                <div className="w-full h-12 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-500/20 rounded-xl flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
+                  <Check className="w-5 h-5" /> Plano Ativo
                 </div>
               ) : (
                 <Button 
-                  className="w-full h-14 text-lg font-bold shadow-xl shadow-primary/25 group"
-                  onClick={() => handleSubscription('RECURRING')}
+                  className="w-full h-12 font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => handleSubscription('RECURRING', 'drive')}
                   disabled={paying}
                 >
-                  {paying ? <Loader2 className="animate-spin w-6 h-6" /> : (
+                  {paying ? <Loader2 className="animate-spin w-5 h-5" /> : "Assinar DRIVE (R$ 59,90)"}
+                </Button>
+              )}
+            </CardFooter>
+          </Card>
+
+          {/* Plano CLOUD */}
+          <Card className={cn(
+            "relative overflow-hidden border-2 transition-all group flex flex-col justify-between shadow-xl shadow-primary/10",
+            planStatus?.planTier === 'cloud' ? "border-primary bg-primary/5" : "border-primary"
+          )}>
+            <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-black px-4 py-1 rounded-bl-xl uppercase tracking-widest animate-pulse">
+              Mais Popular
+            </div>
+
+            <div>
+              <CardHeader className="text-center pb-2">
+                <div className="mx-auto p-3 bg-primary/10 text-primary rounded-full w-fit mb-2">
+                  <Cloud className="w-6 h-6" />
+                </div>
+                <CardTitle className="text-2xl font-bold">Expert CLOUD</CardTitle>
+                <CardDescription>Tudo no Servidor RT Expert</CardDescription>
+              </CardHeader>
+              
+              <CardContent className="text-center py-4">
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-2xl font-bold text-slate-500">R$</span>
+                  <span className="text-5xl font-black tracking-tight text-slate-900 dark:text-white">89</span>
+                  <span className="text-xl font-medium text-slate-500">,90/mês</span>
+                </div>
+                <ul className="mt-6 text-xs text-left space-y-2 text-slate-600 dark:text-slate-400">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary shrink-0" />
+                    <span><strong>15 GB de Nuvem</strong> RT Expert Inclusos</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary shrink-0" />
+                    <span>Até <strong>15 Fotos</strong> por vistoria</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary shrink-0" />
+                    <span>Praticidade total sem precisar conectar Drive</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-primary shrink-0" />
+                    <span>Busca CNPJ + Agenda + Laudos PDF</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </div>
+            
+            <CardFooter className="pt-4 pb-6">
+              {planStatus?.planTier === 'cloud' && planStatus.isPremium ? (
+                <div className="w-full h-12 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-center gap-2 text-primary font-bold text-sm">
+                  <Check className="w-5 h-5" /> Plano Ativo
+                </div>
+              ) : (
+                <Button 
+                  className="w-full h-12 font-bold shadow-lg shadow-primary/20"
+                  onClick={() => handleSubscription('RECURRING', 'cloud')}
+                  disabled={paying}
+                >
+                  {paying ? <Loader2 className="animate-spin w-5 h-5" /> : (
                     <>
-                      Assinar Agora (R$ 80)
-                      <Zap className="ml-2 w-5 h-5 fill-white group-hover:scale-125 transition-transform" />
+                      Assinar CLOUD (R$ 89,90)
+                      <Zap className="ml-1.5 w-4 h-4 fill-white" />
                     </>
                   )}
                 </Button>
@@ -267,45 +361,89 @@ const Upgrade = () => {
             </CardFooter>
           </Card>
 
-          {/* Opção Avulsa */}
-          <Card className="relative overflow-hidden border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50">
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-2xl font-bold">Acesso 30 Dias</CardTitle>
-              <CardDescription>Pagamento Único via PIX</CardDescription>
-            </CardHeader>
+          {/* Plano ENTERPRISE */}
+          <Card className={cn(
+            "relative overflow-hidden border-2 transition-all group flex flex-col justify-between",
+            planStatus?.planTier === 'enterprise' ? "border-purple-500/30 bg-purple-50/10" : "border-slate-200 dark:border-slate-800 hover:border-purple-500/50"
+          )}>
+            <div className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] font-black px-4 py-1 rounded-bl-xl uppercase tracking-widest">
+              Grandes Equipes
+            </div>
+
+            <div>
+              <CardHeader className="text-center pb-2">
+                <div className="mx-auto p-3 bg-purple-50 dark:bg-purple-950/40 text-purple-600 rounded-full w-fit mb-2">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <CardTitle className="text-2xl font-bold">Enterprise</CardTitle>
+                <CardDescription>Capacidade Máxima & Prioridade</CardDescription>
+              </CardHeader>
+              
+              <CardContent className="text-center py-4">
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-2xl font-bold text-slate-500">R$</span>
+                  <span className="text-5xl font-black tracking-tight text-slate-900 dark:text-white">149</span>
+                  <span className="text-xl font-medium text-slate-500">,90/mês</span>
+                </div>
+                <ul className="mt-6 text-xs text-left space-y-2 text-slate-600 dark:text-slate-400">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-purple-500 shrink-0" />
+                    <span><strong>50 GB de Nuvem</strong> RT Expert Inclusos</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-purple-500 shrink-0" />
+                    <span>Fotos <strong>Ilimitadas</strong> por vistoria</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-purple-500 shrink-0" />
+                    <span>Suporte Prioritário VIP no WhatsApp</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-purple-500 shrink-0" />
+                    <span>Todos os recursos liberados</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </div>
             
-            <CardContent className="text-center py-6">
-              <div className="flex items-center justify-center gap-1">
-                <span className="text-2xl font-bold text-slate-500">R$</span>
-                <span className="text-6xl font-black tracking-tight text-slate-900 dark:text-white">99</span>
-                <span className="text-xl font-medium text-slate-500">,90</span>
-              </div>
-              <p className="mt-4 text-sm text-slate-500 font-medium">
-                Sem compromisso mensal. <br />
-                Liberação instantânea após o PIX.
-              </p>
-            </CardContent>
-            
-            <CardFooter className="flex flex-col gap-4 pb-10">
-              {planStatus?.planType === 'premium' ? (
-                <div className="w-full h-14 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-center gap-3 text-slate-400 font-bold opacity-50">
-                   Você já é Expert
+            <CardFooter className="pt-4 pb-6">
+              {planStatus?.planTier === 'enterprise' && planStatus.isPremium ? (
+                <div className="w-full h-12 bg-purple-50 dark:bg-purple-900/20 border border-purple-500/20 rounded-xl flex items-center justify-center gap-2 text-purple-600 dark:text-purple-400 font-bold text-sm">
+                  <Check className="w-5 h-5" /> Plano Ativo
                 </div>
               ) : (
                 <Button 
-                  variant="outline"
-                  className="w-full h-14 text-lg font-bold border-slate-200 dark:border-slate-700 hover:bg-slate-50"
-                  onClick={() => handleSubscription('SINGLE')}
+                  className="w-full h-12 font-bold bg-purple-600 hover:bg-purple-700 text-white"
+                  onClick={() => handleSubscription('RECURRING', 'enterprise')}
                   disabled={paying}
                 >
-                  {paying ? <Loader2 className="animate-spin w-5 h-5" /> : "Comprar Mês (R$ 99,90)"}
+                  {paying ? <Loader2 className="animate-spin w-5 h-5" /> : "Assinar Enterprise (R$ 149,90)"}
                 </Button>
               )}
             </CardFooter>
           </Card>
+
         </div>
 
-        <div className="text-center pt-8">
+        {/* Opção Avulsa PIX */}
+        <div className="max-w-xl mx-auto pt-4">
+          <Card className="border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="font-bold text-slate-900 dark:text-white">Acesso Avulso por 30 Dias (PIX)</h3>
+              <p className="text-xs text-slate-500">Sem renovação recorrente. Pagamento único de R$ 99,90.</p>
+            </div>
+            <Button 
+              variant="outline"
+              onClick={() => handleSubscription('SINGLE', 'cloud')}
+              disabled={paying}
+              className="shrink-0 font-bold border-slate-300 dark:border-slate-700"
+            >
+              Pagar no PIX (R$ 99,90)
+            </Button>
+          </Card>
+        </div>
+
+        <div className="text-center pt-4">
            <button 
              onClick={() => navigate("/")}
              className="text-sm text-slate-500 hover:text-primary font-medium transition-colors"

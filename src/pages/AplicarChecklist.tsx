@@ -216,15 +216,38 @@ const AplicarChecklist = () => {
         toast.warning(`Apenas ${slotsRestantes} foto(s) adicionada(s) — limite de ${maxFotos} por checklist.`);
       }
 
+      const isDriveStorage = planStatus.storageProvider === "google_drive";
+      let driveToken: string | null = null;
+      let driveFolderId: string | null = null;
+
+      if (isDriveStorage) {
+        const { getValidGoogleToken, ensureDriveFolder } = await import("@/lib/google-drive");
+        driveToken = await getValidGoogleToken();
+        if (driveToken) {
+          driveFolderId = await ensureDriveFolder(driveToken, "RT-Expert Inspeções");
+        }
+      }
+
       for (let i = 0; i < itemsToProcess.length; i++) {
         const item = itemsToProcess[i];
 
-        // Free comprime mais para economizar armazenamento
         const compressedBlob = await compressImage(item as File | Blob, {
           maxWidth: limits.fotoMaxWidth,
           quality: limits.fotoQuality
         });
 
+        if (isDriveStorage && driveToken && driveFolderId) {
+          const { uploadPhotoToDrive } = await import("@/lib/google-drive");
+          const fileName = `vistoria_${Date.now()}_${i + 1}.jpg`;
+          const driveResult = await uploadPhotoToDrive(driveToken, driveFolderId, compressedBlob, fileName);
+          
+          if (driveResult?.viewUrl) {
+            newUrls.push(driveResult.viewUrl);
+            continue;
+          }
+        }
+
+        // Fallback ou padrão Supabase Storage
         const fileExt = "jpg";
         const fileName = `${user.id}/${campoId}/${Math.random()}.${fileExt}`;
 

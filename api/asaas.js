@@ -1,16 +1,15 @@
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { type, userId, email, name, cpfCnpj } = req.body;
+  const { type, planTier = 'cloud', userId, email, name, cpfCnpj } = req.body;
   const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
   const isProd = process.env.NODE_ENV === 'production';
   const ASAAS_URL = isProd ? 'https://www.asaas.com/api/v3' : 'https://sandbox.asaas.com/api/v3';
 
   if (!ASAAS_API_KEY) {
-    return res.status(500).json({ error: 'ASAAS_API_KEY non configurada no servidor' });
+    return res.status(500).json({ error: 'ASAAS_API_KEY não configurada no servidor' });
   }
 
   try {
@@ -35,7 +34,7 @@ export default async function handler(req, res) {
           name, 
           email,
           cpfCnpj,
-          externalReference: userId
+          externalReference: `${userId}:${planTier}`
         })
       });
       const newCustomer = await createCustomerResponse.json();
@@ -43,30 +42,26 @@ export default async function handler(req, res) {
       customerId = newCustomer.id;
     }
 
-    // 2. Criar a cobrança ou assinatura
+    // 2. Definir valor e descrição de acordo com o plano
+    let value = 89.9;
+    let description = "Plano RT Expert CLOUD - Assinatura Mensal";
+
+    if (planTier === 'drive') {
+      value = 59.9;
+      description = "Plano RT Expert DRIVE (BYOS Google Drive) - Assinatura Mensal";
+    } else if (planTier === 'enterprise') {
+      value = 149.9;
+      description = "Plano RT Expert ENTERPRISE - Assinatura Mensal";
+    } else if (type === 'SINGLE') {
+      value = 99.9;
+      description = "Plano RT Expert - Acesso Avulso 30 Dias";
+    }
+
+    const externalRef = `${userId}:${planTier}`;
     let paymentData;
     const today = new Date().toISOString().split('T')[0];
-    
-    if (type === 'RECURRING') {
-      // Criar Assinatura (Recorrente) - R$ 80,00
-      const subscriptionResponse = await fetch(`${ASAAS_URL}/subscriptions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'access_token': ASAAS_API_KEY
-        },
-        body: JSON.stringify({
-          customer: customerId,
-          billingType: 'UNDEFINED', // Deixa entrar no checkout e escolher/cadastrar cartão
-          value: 80,
-          nextDueDate: today, // Primeiro pagamento hoje
-          cycle: 'MONTHLY',
-          description: 'Plano RT Expert - Assinatura Mensal Recorrente',
-          externalReference: userId
-        })
-      });
-      paymentData = await subscriptionResponse.json();
-    } else {
+
+    if (type === 'SINGLE') {
       // Criar Cobrança Única (Avulsa) - R$ 99,90
       const paymentResponse = await fetch(`${ASAAS_URL}/payments`, {
         method: 'POST',
@@ -77,27 +72,44 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           customer: customerId,
           billingType: 'UNDEFINED',
-          value: 99.9,
+          value,
           dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
-          description: 'Plano RT Expert - Acesso 30 Dias (Avulso)',
-          externalReference: userId
+          description,
+          externalReference: externalRef
         })
       });
       paymentData = await paymentResponse.json();
+    } else {
+      // Criar Assinatura Recorrente Mensal
+      const subscriptionResponse = await fetch(`${ASAAS_URL}/subscriptions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'access_token': ASAAS_API_KEY
+        },
+        body: JSON.stringify({
+          customer: customerId,
+          billingType: 'UNDEFINED',
+          value,
+          nextDueDate: today,
+          cycle: 'MONTHLY',
+          description,
+          externalReference: externalRef
+        })
+      });
+      paymentData = await subscriptionResponse.json();
     }
 
     if (paymentData.errors) {
       throw new Error(paymentData.errors[0].description);
     }
 
-    // Para assinaturas o link pode estar em 'invoiceUrl' ou 'invoiceCustomizationUrl'
     const checkoutUrl = paymentData.invoiceUrl || 
                         paymentData.bankSlipUrl || 
                         paymentData.checkoutUrl || 
                         paymentData.invoiceCustomizationUrl;
-    
-    if (!checkoutUrl && type === 'RECURRING') {
-      // Caso o Asaas não retorne o link direto na assinatura, tentamos buscar a primeira cobrança dela
+
+    if (!checkoutUrl && type !== 'SINGLE') {
       const paymentsResponse = await fetch(`${ASAAS_URL}/payments?subscription=${paymentData.id}`, {
         headers: { 'access_token': ASAAS_API_KEY }
       });

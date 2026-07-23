@@ -1,23 +1,29 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Fotos de inspeção ficam em bucket privado (LGPD).
- * O banco armazena URLs no formato antigo (public URL) ou caminhos —
- * estas funções convertem qualquer formato em uma URL assinada temporária.
+ * Fotos de inspeção ficam em bucket privado (Supabase) ou no Google Drive do cliente (BYOS).
+ * Esta função identifica o provedor e retorna a URL pronta para exibição.
  */
 
 const BUCKET = "checklist_fotos";
 const MARKER = "/checklist_fotos/";
 
-/** Extrai o caminho dentro do bucket a partir de URL pública, URL assinada ou caminho puro. */
+/** Extrai o caminho dentro do bucket Supabase a partir de URL pública ou assinada. */
 export const getPhotoPath = (stored: string): string => {
   const idx = stored.indexOf(MARKER);
   const raw = idx === -1 ? stored : stored.slice(idx + MARKER.length);
   return decodeURIComponent(raw.split("?")[0]);
 };
 
-/** URL assinada temporária para exibição/download. Retorna o valor original em caso de falha. */
+/** Retorna a URL assinada (Supabase) ou a URL do Google Drive diretamente. */
 export const getSignedPhotoUrl = async (stored: string, expiresInSeconds = 60 * 60 * 12): Promise<string> => {
+  if (!stored) return "";
+
+  // Se a URL já for do Google Drive ou externa, retorna ela mesma
+  if (stored.includes("drive.google.com") || stored.includes("googleusercontent.com") || stored.startsWith("http") && !stored.includes("supabase.co")) {
+    return stored;
+  }
+
   try {
     const { data, error } = await supabase.storage
       .from(BUCKET)
