@@ -4,7 +4,7 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, ClipboardList, Save, Edit3, Settings, ArrowLeft, BoxSelect, ToggleLeft, CalendarDays, List, ImageIcon, Type, Copy, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ClipboardList, Save, Edit3, Settings, ArrowLeft, BoxSelect, ToggleLeft, CalendarDays, List, ImageIcon, Type, Copy, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -67,6 +67,10 @@ const ChecklistDesigner = () => {
   const [activeSecaoId, setActiveSecaoId] = useState<string | null>(null);
   const [activeCampoId, setActiveCampoId] = useState<string | null>(null);
 
+  // Drag and Drop States
+  const [draggedCampo, setDraggedCampo] = useState<{ secaoId: string; index: number } | null>(null);
+  const [draggedSecaoIndex, setDraggedSecaoIndex] = useState<number | null>(null);
+
   // Confirmation dialogs
   const [deleteModeloId, setDeleteModeloId] = useState<string | null>(null);
   const [deleteSecaoId, setDeleteSecaoId] = useState<string | null>(null);
@@ -95,13 +99,11 @@ const ChecklistDesigner = () => {
       setNomeModelo(modelo.nome_modelo);
       setDescricaoModelo(modelo.estrutura_json.descricao || "");
 
-      // Migration from old un-sectioned layout to new one
       const json = modelo.estrutura_json;
       if (json.secoes && json.secoes.length > 0) {
         setSecoes(json.secoes);
         setActiveSecaoId(json.secoes[0].id);
       } else if (json.campos && json.campos.length > 0) {
-        // Migrate old flat format to single section
         const newSecao = {
           id: crypto.randomUUID(),
           titulo: "Seção Geral",
@@ -142,6 +144,37 @@ const ChecklistDesigner = () => {
     if (activeSecaoId === id) setActiveSecaoId(newSecoes[0].id);
   };
 
+  const moveSecao = (secaoId: string, direction: 'up' | 'down') => {
+    const index = secoes.findIndex(s => s.id === secaoId);
+    if (index === -1) return;
+
+    const newSecoes = [...secoes];
+    if (direction === 'up' && index > 0) {
+      [newSecoes[index], newSecoes[index - 1]] = [newSecoes[index - 1], newSecoes[index]];
+    } else if (direction === 'down' && index < newSecoes.length - 1) {
+      [newSecoes[index], newSecoes[index + 1]] = [newSecoes[index + 1], newSecoes[index]];
+    }
+    setSecoes(newSecoes);
+  };
+
+  const duplicarSecao = (secaoId: string) => {
+    const index = secoes.findIndex(s => s.id === secaoId);
+    if (index === -1) return;
+
+    const secaoOriginal = secoes[index];
+    const novaSecao: Secao = {
+      id: crypto.randomUUID(),
+      titulo: `${secaoOriginal.titulo} (Cópia)`,
+      campos: secaoOriginal.campos.map(c => ({ ...c, id: crypto.randomUUID() }))
+    };
+
+    const newSecoes = [...secoes];
+    newSecoes.splice(index + 1, 0, novaSecao);
+    setSecoes(newSecoes);
+    setActiveSecaoId(novaSecao.id);
+    toast.success("Seção duplicada!");
+  };
+
   const addCampo = (tipo: FieldType) => {
     if (!activeSecaoId) {
       toast.error("Selecione ou clique em uma seção primeiro!");
@@ -180,7 +213,7 @@ const ChecklistDesigner = () => {
       if (s.id === secaoId) {
         const index = s.campos.findIndex(c => c.id === campoId);
         if (index === -1) return s;
-        
+
         const newCampos = [...s.campos];
         if (direction === 'up' && index > 0) {
           [newCampos[index], newCampos[index - 1]] = [newCampos[index - 1], newCampos[index]];
@@ -198,14 +231,14 @@ const ChecklistDesigner = () => {
       if (s.id === secaoId) {
         const index = s.campos.findIndex(c => c.id === campoId);
         if (index === -1) return s;
-        
+
         const campoOriginal = s.campos[index];
         const novoCampo = {
           ...campoOriginal,
           id: crypto.randomUUID(),
           label: `${campoOriginal.label} (Cópia)`
         };
-        
+
         const newCampos = [...s.campos];
         newCampos.splice(index + 1, 0, novoCampo);
         return { ...s, campos: newCampos };
@@ -220,6 +253,40 @@ const ChecklistDesigner = () => {
       ...s,
       campos: s.campos.map(c => c.id === campoId ? { ...c, ...updates } : c)
     })));
+  };
+
+  // Drag and drop handlers
+  const handleDropCampo = (targetSecaoId: string, targetIndex: number) => {
+    if (!draggedCampo) return;
+    const { secaoId: sourceSecaoId, index: sourceIndex } = draggedCampo;
+
+    setSecoes(prevSecoes => {
+      const nextSecoes = prevSecoes.map(s => ({ ...s, campos: [...s.campos] }));
+      const sourceSecao = nextSecoes.find(s => s.id === sourceSecaoId);
+      const targetSecao = nextSecoes.find(s => s.id === targetSecaoId);
+
+      if (!sourceSecao || !targetSecao) return prevSecoes;
+
+      const [movedItem] = sourceSecao.campos.splice(sourceIndex, 1);
+      targetSecao.campos.splice(targetIndex, 0, movedItem);
+
+      return nextSecoes;
+    });
+
+    setDraggedCampo(null);
+  };
+
+  const handleDropSecao = (targetIndex: number) => {
+    if (draggedSecaoIndex === null || draggedSecaoIndex === targetIndex) return;
+
+    setSecoes(prev => {
+      const next = [...prev];
+      const [movedSecao] = next.splice(draggedSecaoIndex, 1);
+      next.splice(targetIndex, 0, movedSecao);
+      return next;
+    });
+
+    setDraggedSecaoIndex(null);
   };
 
   const getActiveField = () => {
@@ -237,7 +304,6 @@ const ChecklistDesigner = () => {
       return;
     }
 
-    // Limite de modelos no plano Free (somente para modelos novos)
     if (!editingId) {
       const { canCreate, limite } = await checkModelosLimit();
       if (!canCreate) {
@@ -257,7 +323,6 @@ const ChecklistDesigner = () => {
       return;
     }
 
-    // Normaliza textos para evitar cadastros em caixa alta
     const secoesNormalizadas = secoes.map((s) => ({
       ...s,
       titulo: toTitleCase(s.titulo),
@@ -304,14 +369,6 @@ const ChecklistDesigner = () => {
   };
 
   const activeField = getActiveField();
-  const isCompact = useIsCompact();
-  const isMobile = useIsMobile();
-
-  const getActiveFieldSecaoId = () => {
-    if (!activeCampoId) return null;
-    const secao = secoes.find(s => s.campos.some(c => c.id === activeCampoId));
-    return secao?.id || null;
-  };
 
   const renderFieldProperties = (field: FieldItem) => (
     <div className="space-y-6">
@@ -510,11 +567,11 @@ const ChecklistDesigner = () => {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar: Components (tablet: estreita / desktop: completa) */}
+        {/* Left Sidebar: Components */}
         <aside className="hidden md:flex md:w-56 lg:w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex-col p-4 lg:p-6 overflow-y-auto">
           <div className="mb-8">
             <h3 className="text-slate-900 dark:text-white text-sm font-bold uppercase tracking-wider mb-1">Componentes</h3>
-            <p className="text-slate-500 dark:text-slate-400 text-xs">Clique para adicionar à seção ativa</p>
+            <p className="text-slate-500 dark:text-slate-400 text-xs">Clique para adicionar à seção ativa ou arraste para reposicionar</p>
           </div>
 
           <div className="flex flex-col gap-3">
@@ -579,36 +636,32 @@ const ChecklistDesigner = () => {
 
             {/* Sections */}
             <div className="space-y-6">
-              {secoes.map((secao) => (
+              {secoes.map((secao, secaoIdx) => (
                 <div
                   key={secao.id}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    e.stopPropagation();
+                    setDraggedSecaoIndex(secaoIdx);
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.stopPropagation();
+                    handleDropSecao(secaoIdx);
+                  }}
                   className={`relative p-6 rounded-xl transition-all duration-200 ${activeSecaoId === secao.id
                     ? "bg-white/90 dark:bg-slate-900/90 border-2 border-primary shadow-md"
-                    : "bg-white/50 dark:bg-slate-900/50 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-slate-300 cursor-pointer"
+                    : "bg-white/50 dark:bg-slate-900/50 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-slate-300"
                     }`}
                   onClick={() => setActiveSecaoId(secao.id)}
                 >
 
-                  {/* Section Delete Button */}
-                  {activeSecaoId === secao.id && (
-                    <div className="absolute -right-4 -top-4 flex gap-2">
-                      <button
-                        onClick={() => {
-                          if (secoes.length === 1) {
-                            toast.error("O modelo deve ter pelo menos uma seção.");
-                            return;
-                          }
-                          setDeleteSecaoId(secao.id);
-                        }}
-                        className="p-2 bg-red-500 text-white rounded-full shadow-md hover:bg-red-600 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="mb-6 flex flex-col gap-2 border-b border-slate-100 dark:border-slate-800 pb-4">
-                    <div className="flex items-center gap-2">
+                  {/* Section Controls Header (Move Up/Down, Duplicate, Delete) */}
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+                    <div className="flex items-center gap-2 flex-1">
+                      <div className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+                        <GripVertical className="w-5 h-5" />
+                      </div>
                       <div className="w-1.5 h-6 bg-primary rounded-full"></div>
                       <input
                         className="bg-transparent border-none text-xl font-bold p-0 focus:ring-0 text-slate-900 dark:text-white w-full outline-none"
@@ -619,16 +672,75 @@ const ChecklistDesigner = () => {
                         }}
                       />
                     </div>
+
+                    {/* Section Action Toolbar */}
+                    <div className="flex items-center gap-1 shrink-0 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-lg">
+                      <button
+                        title="Mover Seção para Cima"
+                        onClick={(e) => { e.stopPropagation(); moveSecao(secao.id, 'up'); }}
+                        disabled={secaoIdx === 0}
+                        className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-primary disabled:opacity-30 rounded-md hover:bg-white dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        title="Mover Seção para Baixo"
+                        onClick={(e) => { e.stopPropagation(); moveSecao(secao.id, 'down'); }}
+                        disabled={secaoIdx === secoes.length - 1}
+                        className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-primary disabled:opacity-30 rounded-md hover:bg-white dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                      <button
+                        title="Duplicar Seção"
+                        onClick={(e) => { e.stopPropagation(); duplicarSecao(secao.id); }}
+                        className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-primary rounded-md hover:bg-white dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                      <button
+                        title="Excluir Seção"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (secoes.length === 1) {
+                            toast.error("O modelo deve ter pelo menos uma seção.");
+                            return;
+                          }
+                          setDeleteSecaoId(secao.id);
+                        }}
+                        className="p-1.5 text-red-500 hover:text-red-600 rounded-md hover:bg-white dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Fields in Section */}
-                  <div className="space-y-4">
-                    {secao.campos.map((campo) => {
+                  <div
+                    className="space-y-4 min-h-[50px]"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.stopPropagation();
+                      handleDropCampo(secao.id, secao.campos.length);
+                    }}
+                  >
+                    {secao.campos.map((campo, campoIdx) => {
                       const isActive = activeCampoId === campo.id;
                       return (
                         <div
                           key={campo.id}
-                          className={`relative group p-5 bg-white dark:bg-slate-900 rounded-lg border transition-all ${isActive ? "border-primary shadow-md ring-1 ring-primary" : "border-slate-200 dark:border-slate-800 shadow-sm hover:border-primary/50"
+                          draggable={true}
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            e.dataTransfer.setData("text/plain", "");
+                            setDraggedCampo({ secaoId: secao.id, index: campoIdx });
+                          }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.stopPropagation();
+                            handleDropCampo(secao.id, campoIdx);
+                          }}
+                          className={`relative group p-4 md:p-5 bg-white dark:bg-slate-900 rounded-lg border transition-all ${isActive ? "border-primary shadow-md ring-1 ring-primary" : "border-slate-200 dark:border-slate-800 shadow-sm hover:border-primary/50"
                             }`}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -637,13 +749,52 @@ const ChecklistDesigner = () => {
                           }}
                         >
                           <div className="flex flex-col gap-3">
-                            <div className="flex justify-between items-start">
-                              <label className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight flex-1 mr-4">
-                                {campo.label || "Pergunta sem título"}
-                              </label>
-                              {campo.obrigatorio && (
-                                <span className="text-[10px] bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded-full font-bold">OBRIGATÓRIO</span>
-                              )}
+                            <div className="flex justify-between items-center gap-2">
+                              <div className="flex items-center gap-2 flex-1">
+                                <div className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                  <GripVertical className="w-4 h-4" />
+                                </div>
+                                <label className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight flex-1">
+                                  {campo.label || "Pergunta sem título"}
+                                </label>
+                              </div>
+
+                              {/* Field Action Buttons (Always Visible on Header) */}
+                              <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 p-1 rounded-md border border-slate-200 dark:border-slate-700">
+                                {campo.obrigatorio && (
+                                  <span className="text-[10px] bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded-full font-bold mr-1">OBRIGATÓRIO</span>
+                                )}
+                                <button
+                                  title="Mover para cima"
+                                  onClick={(e) => { e.stopPropagation(); moveCampo(secao.id, campo.id, 'up'); }}
+                                  disabled={campoIdx === 0}
+                                  className="p-1 text-slate-400 hover:text-primary disabled:opacity-30"
+                                >
+                                  <ChevronUp className="w-4 h-4" />
+                                </button>
+                                <button
+                                  title="Mover para baixo"
+                                  onClick={(e) => { e.stopPropagation(); moveCampo(secao.id, campo.id, 'down'); }}
+                                  disabled={campoIdx === secao.campos.length - 1}
+                                  className="p-1 text-slate-400 hover:text-primary disabled:opacity-30"
+                                >
+                                  <ChevronDown className="w-4 h-4" />
+                                </button>
+                                <button
+                                  title="Duplicar pergunta"
+                                  onClick={(e) => { e.stopPropagation(); duplicarCampo(secao.id, campo.id); }}
+                                  className="p-1 text-slate-400 hover:text-primary"
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </button>
+                                <button
+                                  title="Excluir pergunta"
+                                  onClick={(e) => { e.stopPropagation(); removeCampo(secao.id, campo.id); }}
+                                  className="p-1 text-slate-400 hover:text-red-500"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
 
                             {/* Field Preview based on Type */}
@@ -684,31 +835,13 @@ const ChecklistDesigner = () => {
                               )}
                             </div>
                           </div>
-
-                          {/* Quick Actions (Delete, Move, Duplicate) */}
-                          {isActive && (
-                            <div className="absolute -right-3 top-[-10px] flex gap-1">
-                              <button onClick={(e) => { e.stopPropagation(); moveCampo(secao.id, campo.id, 'up'); }} className="p-1.5 bg-white dark:bg-slate-800 rounded-md shadow-md border border-slate-200 text-slate-400 hover:text-primary transition-colors">
-                                <ChevronUp className="w-4 h-4" />
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); moveCampo(secao.id, campo.id, 'down'); }} className="p-1.5 bg-white dark:bg-slate-800 rounded-md shadow-md border border-slate-200 text-slate-400 hover:text-primary transition-colors">
-                                <ChevronDown className="w-4 h-4" />
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); duplicarCampo(secao.id, campo.id); }} className="p-1.5 bg-white dark:bg-slate-800 rounded-md shadow-md border border-slate-200 text-slate-400 hover:text-primary transition-colors">
-                                <Copy className="w-4 h-4" />
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); removeCampo(secao.id, campo.id); }} className="p-1.5 bg-white dark:bg-slate-800 rounded-md shadow-md border border-slate-200 text-slate-400 hover:text-red-500 transition-colors">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          )}
                         </div>
                       )
                     })}
 
                     {secao.campos.length === 0 && (
                       <div className="py-8 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-800/30">
-                        <span className="text-sm font-medium">Seção vazia. Adicione componentes do menu esquerdo.</span>
+                        <span className="text-sm font-medium">Seção vazia. Adicione componentes ou arraste perguntas para cá.</span>
                       </div>
                     )}
                   </div>
@@ -798,87 +931,14 @@ const ChecklistDesigner = () => {
               <span className="text-[10px] font-medium whitespace-nowrap">{label}</span>
             </button>
           ))}
-          <button
-            onClick={addSecao}
-            className="flex flex-col items-center justify-center gap-1 min-w-[64px] px-2 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="text-[10px] font-bold whitespace-nowrap">Seção</span>
-          </button>
         </div>
       </div>
-
-      {/* Mobile/tablet: field properties sheet (celular: de baixo / tablet: lateral direita) */}
-      <Sheet open={isCompact && !!activeField} onOpenChange={(open) => { if (!open) setActiveCampoId(null); }}>
-        <SheetContent
-          side={isMobile ? "bottom" : "right"}
-          className={isMobile ? "max-h-[75vh] overflow-y-auto rounded-t-xl" : "w-[340px] sm:max-w-[340px] overflow-y-auto"}
-        >
-          <SheetHeader className="text-left">
-            <SheetTitle className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-              Propriedades do Campo
-            </SheetTitle>
-          </SheetHeader>
-          {activeField && (
-            <div className="pt-4 pb-2 space-y-6">
-              {renderFieldProperties(activeField)}
-
-              <div className="flex gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => {
-                    const sId = getActiveFieldSecaoId();
-                    if (sId) moveCampo(sId, activeField.id, 'up');
-                  }}
-                >
-                  <ChevronUp className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => {
-                    const sId = getActiveFieldSecaoId();
-                    if (sId) moveCampo(sId, activeField.id, 'down');
-                  }}
-                >
-                  <ChevronDown className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => {
-                    const sId = getActiveFieldSecaoId();
-                    if (sId) duplicarCampo(sId, activeField.id);
-                  }}
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 text-red-500 hover:text-red-600"
-                  onClick={() => {
-                    const sId = getActiveFieldSecaoId();
-                    if (sId) removeCampo(sId, activeField.id);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
 
       <ConfirmDialog
         open={exitConfirmOpen}
         onOpenChange={setExitConfirmOpen}
         title="Sair do editor?"
-        description="Alterações não salvas serão perdidas."
+        description="As alterações não salvas serão descartadas."
         confirmLabel="Sair sem salvar"
         destructive
         onConfirm={() => {
@@ -891,8 +951,8 @@ const ChecklistDesigner = () => {
         open={!!deleteSecaoId}
         onOpenChange={(open) => { if (!open) setDeleteSecaoId(null); }}
         title="Excluir seção?"
-        description="Todos os campos desta seção serão removidos junto com ela."
-        confirmLabel="Excluir seção"
+        description="Esta ação removerá a seção e todos os campos contidos nela."
+        confirmLabel="Excluir Seção"
         destructive
         onConfirm={() => {
           if (deleteSecaoId) removeSecao(deleteSecaoId);
