@@ -5,13 +5,8 @@ import { User } from "@supabase/supabase-js";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   Menu,
-  Home,
-  Users,
-  ClipboardList,
   FileCheck,
   LogOut,
-  ClipboardCheck,
-  Sparkles,
   Map,
   Settings as SettingsIcon,
   CheckSquare,
@@ -23,7 +18,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { computePlanStatus } from "@/lib/plan-limits";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,13 +31,12 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/components/ui/avatar";
+import { getPlanStatus, type PlanStatus, PLAN_LIMITS } from "@/lib/plan-limits";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
-// Cache local do perfil: evita o "pisca" da marca padrão a cada troca de página,
-// já que o Layout é remontado em toda navegação e o perfil vem do banco de forma assíncrona.
 const PROFILE_CACHE_KEY = "rt_profile_cache";
 
 interface CachedProfile {
@@ -51,7 +44,7 @@ interface CachedProfile {
   logoUrl: string;
   userName: string;
   avatarUrl: string;
-  planStatus: { isPremium: boolean; planType: string; daysLeft: number } | null;
+  planStatus: PlanStatus | null;
 }
 
 const readProfileCache = (): CachedProfile | null => {
@@ -60,6 +53,57 @@ const readProfileCache = (): CachedProfile | null => {
   } catch {
     return null;
   }
+};
+
+const PlanStatusCard = ({ status, onNavigate }: { status: PlanStatus | null; onNavigate?: () => void }) => {
+  if (!status) return null;
+
+  const isFree = !status.isPremium;
+  const badgeLabel = isFree 
+    ? "Free" 
+    : status.planTier === "drive" 
+    ? "Expert Drive" 
+    : status.planTier === "enterprise" 
+    ? "Enterprise" 
+    : "Expert";
+
+  const badgeStyle = isFree
+    ? "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+    : status.planTier === "enterprise"
+    ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400"
+    : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400";
+
+  return (
+    <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
+      <Link to="/upgrade" onClick={onNavigate} className="flex items-center justify-between mb-2 group cursor-pointer">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-primary transition-colors">Meu Plano</span>
+        <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase", badgeStyle)}>
+          {badgeLabel}
+        </span>
+      </Link>
+
+      {status.isPremium && status.daysLeft > 0 && (
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-500">{status.trialActive ? 'Trial Expert' : 'Plano Ativo'}</span>
+            <span className="font-bold text-primary">{status.daysLeft} {status.daysLeft === 1 ? 'dia' : 'dias'}</span>
+          </div>
+          <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-primary transition-all duration-1000" 
+              style={{ width: `${Math.min(100, (status.daysLeft / 30) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {isFree && (
+        <Link to="/upgrade" onClick={onNavigate} className="block text-center text-[11px] font-bold text-primary hover:underline mt-1 uppercase">
+          Assinar Plano Expert
+        </Link>
+      )}
+    </div>
+  );
 };
 
 const Layout = ({ children }: LayoutProps) => {
@@ -72,7 +116,7 @@ const Layout = ({ children }: LayoutProps) => {
   const [logoUrl, setLogoUrl] = useState(cached?.logoUrl || "");
   const [userName, setUserName] = useState(cached?.userName || "Usuário");
   const [avatarUrl, setAvatarUrl] = useState(cached?.avatarUrl || "");
-  const [planStatus, setPlanStatus] = useState<{ isPremium: boolean; planType: string; daysLeft: number } | null>(cached?.planStatus || null);
+  const [planStatus, setPlanStatus] = useState<PlanStatus | null>(cached?.planStatus || null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -98,40 +142,34 @@ const Layout = ({ children }: LayoutProps) => {
   }, [navigate]);
 
   const loadSettings = async (userId: string) => {
+    const status = await getPlanStatus();
+
     const { data } = await supabase
       .from("profiles")
-      .select("company_name, logo_url, nome_rt, avatar_url, plan_type, trial_ends_at, plan_expires_at")
+      .select("company_name, logo_url, nome_rt, avatar_url")
       .eq("id", userId)
       .maybeSingle();
 
     const profileData = data as any;
 
-    if (profileData) {
-      const status = computePlanStatus(profileData);
+    const fresh: CachedProfile = {
+      companyName: profileData?.company_name || "RT-Expert",
+      logoUrl: profileData?.logo_url || "",
+      userName: profileData?.nome_rt || "Usuário",
+      avatarUrl: profileData?.avatar_url || "",
+      planStatus: status
+    };
 
-      const fresh: CachedProfile = {
-        companyName: profileData.company_name || "RT-Expert",
-        logoUrl: profileData.logo_url || "",
-        userName: profileData.nome_rt || "Usuário",
-        avatarUrl: profileData.avatar_url || "",
-        planStatus: {
-          isPremium: status.isPremium,
-          planType: status.planType,
-          daysLeft: status.daysLeft
-        }
-      };
+    setCompanyName(fresh.companyName);
+    setLogoUrl(fresh.logoUrl);
+    setUserName(fresh.userName);
+    setAvatarUrl(fresh.avatarUrl);
+    setPlanStatus(fresh.planStatus);
 
-      setCompanyName(fresh.companyName);
-      setLogoUrl(fresh.logoUrl);
-      setUserName(fresh.userName);
-      setAvatarUrl(fresh.avatarUrl);
-      setPlanStatus(fresh.planStatus);
-
-      try {
-        localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(fresh));
-      } catch {
-        // storage cheio/indisponível: segue sem cache
-      }
+    try {
+      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(fresh));
+    } catch {
+      // storage cheio/indisponível: segue sem cache
     }
   };
 
@@ -146,9 +184,6 @@ const Layout = ({ children }: LayoutProps) => {
   };
 
   const navItems = [
-    { icon: Home, label: "Dashboard", path: "/" },
-    { icon: Users, label: "Clientes", path: "/clientes" },
-    { icon: ClipboardList, label: "Criar Checklist", path: "/checklist-designer" },
     { icon: FileCheck, label: "Fazer Inspeção", path: "/aplicar-checklist" },
     { icon: Map, label: "Mapa de Clientes", path: "/mapa-clientes" },
     { icon: CheckSquare, label: "Visitas Feitas", path: "/checklists-prontos" },
@@ -159,33 +194,15 @@ const Layout = ({ children }: LayoutProps) => {
     <>
       {navItems.map((item) => {
         const isActive = location.pathname === item.path;
-
-        if (item.path === "/checklist-designer" && isMobile) {
-          return (
-            <div
-              key={item.path}
-              onClick={() => {
-                setMobileMenuOpen(false);
-                toast.info("Para melhor experiência visual, crie e edite seus checklists através de um Computador ou Tela Grande.", { icon: "🖥️" });
-              }}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors cursor-pointer text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
-              title="Acesse via Computador"
-            >
-              <item.icon className="w-5 h-5 opacity-50" />
-              <span>{item.label}</span>
-            </div>
-          );
-        }
-
         return (
           <Link
             key={item.path}
             to={item.path}
-            onClick={() => setMobileMenuOpen(false)}
+            onClick={() => isMobile && setMobileMenuOpen(false)}
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors cursor-pointer",
               isActive
-                ? "bg-primary/10 text-primary"
+                ? "bg-primary/10 text-primary font-bold"
                 : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
             )}
           >
@@ -248,40 +265,7 @@ const Layout = ({ children }: LayoutProps) => {
           </button>
 
           {/* Plan Status Card in Sidebar */}
-          {planStatus && (
-            <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
-              <Link to="/upgrade" className="flex items-center justify-between mb-2 group cursor-pointer">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-primary transition-colors">Meu Plano</span>
-                <span className={cn(
-                  "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                  planStatus.isPremium ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400" : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
-                )}>
-                  {planStatus.isPremium ? "Expert" : "Free"}
-                </span>
-              </Link>
-              
-              {planStatus.daysLeft > 0 && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">{planStatus.planType === 'premium' ? 'Plano Expert' : 'Trial Expert'}</span>
-                    <span className="font-bold text-primary">{planStatus.daysLeft} {planStatus.daysLeft === 1 ? 'dia' : 'dias'}</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-primary transition-all duration-1000" 
-                      style={{ width: `${Math.min(100, (planStatus.daysLeft / 30) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-              
-              {planStatus.planType !== 'premium' && (
-                <Link to="/upgrade" className="block text-center text-[11px] font-bold text-primary hover:underline mt-1 uppercase">
-                  Assinar Plano Expert
-                </Link>
-              )}
-            </div>
-          )}
+          <PlanStatusCard status={planStatus} />
         </div>
       </aside>
 
@@ -420,40 +404,7 @@ const Layout = ({ children }: LayoutProps) => {
                   </button>
 
                   {/* Plan Status Card Mobile */}
-                  {planStatus && (
-                    <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800">
-                      <Link to="/upgrade" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between mb-2 group cursor-pointer">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-primary transition-colors">Meu Plano</span>
-                        <span className={cn(
-                          "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                          planStatus.isPremium ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400" : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
-                        )}>
-                          {planStatus.isPremium ? "Expert" : "Free"}
-                        </span>
-                      </Link>
-                      
-                      {planStatus.daysLeft > 0 && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-slate-500">{planStatus.planType === 'premium' ? 'Plano Expert' : 'Trial Expert'}</span>
-                            <span className="font-bold text-primary">{planStatus.daysLeft} {planStatus.daysLeft === 1 ? 'dia' : 'dias'}</span>
-                          </div>
-                          <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-primary transition-all duration-1000" 
-                              style={{ width: `${Math.min(100, (planStatus.daysLeft / 30) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                      
-                      {planStatus.planType !== 'premium' && (
-                        <Link to="/upgrade" onClick={() => setMobileMenuOpen(false)} className="block text-center text-[11px] font-bold text-primary hover:underline mt-1 uppercase">
-                          Assinar Plano Expert
-                        </Link>
-                      )}
-                    </div>
-                  )}
+                  <PlanStatusCard status={planStatus} onNavigate={() => setMobileMenuOpen(false)} />
                 </div>
               </SheetContent>
             </Sheet>
