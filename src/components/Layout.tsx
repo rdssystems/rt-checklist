@@ -14,7 +14,10 @@ import {
   Search,
   Bell,
   User as UserIcon,
-  ChevronLeft
+  ChevronLeft,
+  ClipboardList,
+  Users,
+  Home
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -184,7 +187,10 @@ const Layout = ({ children }: LayoutProps) => {
   };
 
   const navItems = [
+    { icon: Home, label: "Início", path: "/" },
+    { icon: ClipboardList, label: "Modelos de Checklist", path: "/checklist-designer" },
     { icon: FileCheck, label: "Fazer Inspeção", path: "/aplicar-checklist" },
+    { icon: Users, label: "Clientes", path: "/clientes" },
     { icon: Map, label: "Mapa de Clientes", path: "/mapa-clientes" },
     { icon: CheckSquare, label: "Visitas Feitas", path: "/checklists-prontos" },
     { icon: Calendar, label: "Agenda", path: "/visitas" },
@@ -200,7 +206,7 @@ const Layout = ({ children }: LayoutProps) => {
             to={item.path}
             onClick={() => isMobile && setMobileMenuOpen(false)}
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors cursor-pointer",
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors cursor-pointer text-sm",
               isActive
                 ? "bg-primary/10 text-primary font-bold"
                 : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -247,9 +253,9 @@ const Layout = ({ children }: LayoutProps) => {
           <Link
             to="/settings"
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors cursor-pointer",
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors cursor-pointer text-sm",
               location.pathname === "/settings"
-                ? "bg-primary/10 text-primary"
+                ? "bg-primary/10 text-primary font-bold"
                 : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
             )}
           >
@@ -258,7 +264,7 @@ const Layout = ({ children }: LayoutProps) => {
           </Link>
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg font-medium transition-colors cursor-pointer text-left"
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg font-medium transition-colors cursor-pointer text-left text-sm"
           >
             <LogOut className="w-5 h-5" />
             <span>Sair</span>
@@ -386,9 +392,9 @@ const Layout = ({ children }: LayoutProps) => {
                     to="/settings"
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors",
+                      "flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors text-sm",
                       location.pathname === "/settings"
-                        ? "bg-primary/10 text-primary"
+                        ? "bg-primary/10 text-primary font-bold"
                         : "text-slate-600 hover:bg-slate-50"
                     )}
                   >
@@ -397,7 +403,7 @@ const Layout = ({ children }: LayoutProps) => {
                   </Link>
                   <button
                     onClick={handleSignOut}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors text-left text-sm"
                   >
                     <LogOut className="w-5 h-5" />
                     <span>Sair</span>
