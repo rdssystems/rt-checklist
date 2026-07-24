@@ -16,7 +16,6 @@ import { compressImage } from "@/lib/image-utils";
 import { toTitleCase, toSentenceCase } from "@/lib/text-utils";
 import SignedPhoto from "@/components/SignedPhoto";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
-import { gerarPDFInspecao } from "@/lib/pdf-generator";
 import customSelectStyles from "@/components/select-styles";
 import Select from "react-select";
 import type { Cliente } from "@/types";
@@ -62,6 +61,9 @@ interface SavedChecklistProgress {
   nomeRT: string;
   nomeClienteAssinatura: string;
   nomeTestemunhaAssinatura: string;
+  assinaturaRT?: string;
+  assinaturaCliente?: string;
+  assinaturaTestemunha?: string;
 }
 
 const AplicarChecklist = () => {
@@ -127,6 +129,9 @@ const AplicarChecklist = () => {
         setNomeRT(parsed.nomeRT || "");
         setNomeClienteAssinatura(parsed.nomeClienteAssinatura || "");
         setNomeTestemunhaAssinatura(parsed.nomeTestemunhaAssinatura || "");
+        if (parsed.assinaturaRT) setAssinaturaRT(parsed.assinaturaRT);
+        if (parsed.assinaturaCliente) setAssinaturaCliente(parsed.assinaturaCliente);
+        if (parsed.assinaturaTestemunha) setAssinaturaTestemunha(parsed.assinaturaTestemunha);
 
         if (!restoredToastShown) {
           toast.info("Progresso do checklist restaurado automaticamente.");
@@ -144,7 +149,9 @@ const AplicarChecklist = () => {
       modeloSelecionado ||
       Object.keys(respostas).length > 0 ||
       parecerConclusivo ||
-      dataProximaInspecao;
+      dataProximaInspecao ||
+      assinaturaRT ||
+      assinaturaCliente;
 
     if (!hasData) {
       localStorage.removeItem(PROGRESS_STORAGE_KEY);
@@ -161,6 +168,9 @@ const AplicarChecklist = () => {
       nomeRT,
       nomeClienteAssinatura,
       nomeTestemunhaAssinatura,
+      assinaturaRT,
+      assinaturaCliente,
+      assinaturaTestemunha,
     };
 
     try {
@@ -178,6 +188,9 @@ const AplicarChecklist = () => {
     nomeRT,
     nomeClienteAssinatura,
     nomeTestemunhaAssinatura,
+    assinaturaRT,
+    assinaturaCliente,
+    assinaturaTestemunha,
   ]);
 
   const clearProgress = () => {
@@ -186,6 +199,14 @@ const AplicarChecklist = () => {
     setClienteSelecionado("");
     setModeloSelecionado("");
     setCurrentSectionIndex(0);
+    setAssinaturaRT("");
+    setAssinaturaCliente("");
+    setAssinaturaTestemunha("");
+    setParecerConclusivo("");
+    setDataProximaInspecao("");
+    setNomeRT("");
+    setNomeClienteAssinatura("");
+    setNomeTestemunhaAssinatura("");
   };
 
   const fetchClientes = async () => {
@@ -402,7 +423,7 @@ const AplicarChecklist = () => {
       return;
     }
     if (!assinaturaRT || !assinaturaCliente) {
-      toast.error("As assinaturas são obrigatórias");
+      toast.error("As assinaturas do Responsável Técnico e do Cliente são obrigatórias.");
       return;
     }
     
@@ -496,11 +517,6 @@ const AplicarChecklist = () => {
       setSavingModalOpen(false);
       toast.success("Checklist aplicado com sucesso!");
       clearProgress();
-      setAssinaturaRT("");
-      setAssinaturaCliente("");
-      setAssinaturaTestemunha("");
-      setParecerConclusivo("");
-      setDataProximaInspecao("");
       setIsReviewMode(false);
     }, 600);
   };
@@ -794,38 +810,50 @@ const AplicarChecklist = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {/* RT Signature */}
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold text-slate-700">Responsável Técnico *</Label>
+                      <Label className="text-sm font-bold text-slate-700 dark:text-slate-300">Responsável Técnico *</Label>
                       <Input
                         placeholder="Nome Completo do RT"
                         value={nomeRT}
                         onChange={e => setNomeRT(e.target.value)}
                         className="mb-2"
                       />
-                      <SignatureCanvas onSave={setAssinaturaRT} />
+                      <SignatureCanvas
+                        label="Assinatura do RT"
+                        signatureData={assinaturaRT}
+                        onSave={setAssinaturaRT}
+                      />
                     </div>
 
                     {/* Client Signature */}
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold text-slate-700">Representante do Cliente *</Label>
+                      <Label className="text-sm font-bold text-slate-700 dark:text-slate-300">Representante do Cliente *</Label>
                       <Input
                         placeholder="Nome Completo do Responsável"
                         value={nomeClienteAssinatura}
                         onChange={e => setNomeClienteAssinatura(e.target.value)}
                         className="mb-2"
                       />
-                      <SignatureCanvas onSave={setAssinaturaCliente} />
+                      <SignatureCanvas
+                        label="Assinatura do Cliente"
+                        signatureData={assinaturaCliente}
+                        onSave={setAssinaturaCliente}
+                      />
                     </div>
 
                     {/* Witness Signature */}
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold text-slate-700">Testemunha (Opcional)</Label>
+                      <Label className="text-sm font-bold text-slate-700 dark:text-slate-300">Testemunha (Opcional)</Label>
                       <Input
                         placeholder="Nome da Testemunha"
                         value={nomeTestemunhaAssinatura}
                         onChange={e => setNomeTestemunhaAssinatura(e.target.value)}
                         className="mb-2"
                       />
-                      <SignatureCanvas onSave={setAssinaturaTestemunha} />
+                      <SignatureCanvas
+                        label="Assinatura da Testemunha"
+                        signatureData={assinaturaTestemunha}
+                        onSave={setAssinaturaTestemunha}
+                      />
                     </div>
                   </div>
 
